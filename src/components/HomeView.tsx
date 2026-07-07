@@ -14,11 +14,16 @@ import {
   Moon,
   Sun,
   LayoutGrid,
-  FileText
+  FileText,
+  MessageSquare,
+  Globe,
+  MapPin,
+  Mail,
+  Facebook
 } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 import { getGlobalSettings } from "../services/settingsService";
-import { getPublicActiveExams } from "../services/examService";
+import { getPublicActiveExams, getExamByCodeOrId } from "../services/examService";
 import { registerOrResumeCandidate } from "../services/candidateService";
 
 interface HomeViewProps {
@@ -38,6 +43,7 @@ export default function HomeView({
   const [phoneNumber, setPhoneNumber] = useState("");
   
   const [error, setError] = useState("");
+  const [pathError, setPathError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showTeacherModal, setShowTeacherModal] = useState(false);
 
@@ -45,37 +51,69 @@ export default function HomeView({
   const [tests, setTests] = useState<any[]>([]);
   const [selectedTestId, setSelectedTestId] = useState("exam-test-1");
   const [isTestLocked, setIsTestLocked] = useState(false);
-  const [globalSettings, setGlobalSettings] = useState({ backgroundColor: "#002147", logoUrl: "" });
+  const [globalSettings, setGlobalSettings] = useState<any>({
+    backgroundColor: "#002147",
+    logoUrl: "",
+    contactName: "Trung tâm Tiếng Anh Conquer English",
+    contactPhone: "0912 345 678",
+    contactEmail: "info@conquerenglish.edu.vn",
+    contactZalo: "0912 345 678",
+    contactFacebook: "https://facebook.com/conquerenglish",
+    contactWebsite: "https://conquerenglish.edu.vn",
+    contactAddress: "Số 123 Đường Cầu Giấy, Quận Cầu Giấy, Hà Nội"
+  });
 
   useEffect(() => {
-    // 1. Fetch system logo & branding background color
+    // 1. Fetch system logo & branding background color & contact details
     getGlobalSettings()
       .then((data) => {
-        if (data.backgroundColor) {
-          setGlobalSettings(data);
-        }
+        setGlobalSettings(data);
       })
       .catch((err) => console.error("Error loading global settings:", err));
 
-    // 2. Fetch active tests
-    getPublicActiveExams()
-      .then((data) => {
-        setTests(data);
-        
-        // 3. Check for specific test ID from URL query parameters (e.g., ?test=test-4)
-        const params = new URLSearchParams(window.location.search);
-        const urlTestId = params.get("test");
-        if (urlTestId) {
-          const matched = data.find(
-            (t: any) => t.id === urlTestId || t.code === urlTestId
-          );
-          if (matched) {
-            setSelectedTestId(matched.id);
+    // 2. Determine path-based routing
+    const pathname = window.location.pathname;
+    const examPathMatch = pathname.match(/^\/exam\/([a-zA-Z0-9_\-]+)$/);
+    const pathExamCode = examPathMatch ? examPathMatch[1] : null;
+
+    if (pathExamCode) {
+      getExamByCodeOrId(pathExamCode)
+        .then((exam) => {
+          if (!exam) {
+            setPathError("Kỳ thi không tồn tại hoặc đường dẫn không chính xác. Vui lòng kiểm tra lại.");
+          } else if (exam.status !== "Đang mở") {
+            setPathError("This exam is currently closed or has expired.");
+          } else {
+            setTests([exam]);
+            setSelectedTestId(exam.id);
             setIsTestLocked(true);
           }
-        }
-      })
-      .catch((err) => console.error("Error loading public tests:", err));
+        })
+        .catch((err) => {
+          console.error("Error loading path-based exam:", err);
+          setPathError("Không thể tải thông tin kỳ thi. Vui lòng thử lại sau.");
+        });
+    } else {
+      // 3. Regular active tests load
+      getPublicActiveExams()
+        .then((data) => {
+          setTests(data);
+          
+          // Fallback check for URL query parameters (e.g., ?test=test-4)
+          const params = new URLSearchParams(window.location.search);
+          const urlTestId = params.get("test");
+          if (urlTestId) {
+            const matched = data.find(
+              (t: any) => t.id === urlTestId || t.code === urlTestId
+            );
+            if (matched) {
+              setSelectedTestId(matched.id);
+              setIsTestLocked(true);
+            }
+          }
+        })
+        .catch((err) => console.error("Error loading public tests:", err));
+    }
   }, []);
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -210,117 +248,146 @@ export default function HomeView({
         {/* Right pane: Candidate Registration Form */}
         <div className="lg:col-span-6">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-6 sm:p-8 space-y-6">
-            <div className="space-y-1">
-              <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">ĐĂNG KÝ DỰ THI</h2>
-              <p className="text-xs text-slate-500">
-                Mỗi số điện thoại chỉ được thi 1 lần trên mỗi bài thi. Đăng ký đúng thông tin để tiếp tục bài thi đang dở.
-              </p>
-            </div>
+            {pathError ? (
+              <div className="space-y-6 py-4 text-center">
+                <div className="inline-flex p-4 rounded-full bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400">
+                  <AlertCircle size={40} className="animate-bounce" />
+                </div>
+                <div className="space-y-2">
+                  <h2 className="text-xl font-bold text-red-600 dark:text-red-400 uppercase tracking-tight">KỲ THI CHƯA SẴN SÀNG</h2>
+                  <p className="text-sm font-medium text-slate-650 dark:text-slate-350 px-2 leading-relaxed">
+                    {pathError}
+                  </p>
+                </div>
+                
+                <div className="border-t border-slate-100 dark:border-slate-800 pt-6 space-y-4">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500">LIÊN HỆ QUẢN TRỊ VIÊN PHÒNG THI</p>
+                  <button
+                    type="button"
+                    onClick={() => setShowTeacherModal(true)}
+                    className="w-full py-3 px-5 border-2 font-bold text-sm rounded-xl transition cursor-pointer active:scale-95 flex items-center justify-center gap-1.5 bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800"
+                    style={{ borderColor: brandBgColor, color: brandBgColor }}
+                  >
+                    <PhoneCall size={14} />
+                    THÔNG TIN LIÊN HỆ GIÁO VIÊN
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-1">
+                  <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">ĐĂNG KÝ DỰ THI</h2>
+                  <p className="text-xs text-slate-500">
+                    Mỗi số điện thoại chỉ được thi 1 lần trên mỗi bài thi. Đăng ký đúng thông tin để tiếp tục bài thi đang dở.
+                  </p>
+                </div>
 
-            <form onSubmit={handleRegister} className="space-y-4">
-              {/* Dynamic Test Selector */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Bài thi tuyển sinh
-                </label>
-                {isTestLocked ? (
-                  <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex items-center gap-2 text-sm font-semibold">
-                    <FileText size={16} className="text-indigo-500" style={brandTextStyle} />
-                    <span>{currentTestObj ? currentTestObj.name : selectedTestId} (Đang khóa theo link)</span>
+                <form onSubmit={handleRegister} className="space-y-4">
+                  {/* Dynamic Test Selector */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Bài thi tuyển sinh
+                    </label>
+                    {isTestLocked ? (
+                      <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex items-center gap-2 text-sm font-semibold">
+                        <FileText size={16} className="text-indigo-500" style={brandTextStyle} />
+                        <span>{currentTestObj ? currentTestObj.name : selectedTestId} (Đang khóa theo link)</span>
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <FileText size={16} className="absolute left-3.5 top-3.5 text-slate-400" />
+                        <select
+                          value={selectedTestId}
+                          onChange={(e) => setSelectedTestId(e.target.value)}
+                          className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-850 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm appearance-none cursor-pointer font-medium"
+                        >
+                          {tests.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.name} ({t.category})
+                            </option>
+                          ))}
+                          {tests.length === 0 && (
+                            <option value="exam-test-1">Test 1 On The Go (IELTS)</option>
+                          )}
+                        </select>
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
+                          <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                            <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
+                          </svg>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="relative">
-                    <FileText size={16} className="absolute left-3.5 top-3.5 text-slate-400" />
-                    <select
-                      value={selectedTestId}
-                      onChange={(e) => setSelectedTestId(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-850 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm appearance-none cursor-pointer font-medium"
-                    >
-                      {tests.map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.name} ({t.category})
-                        </option>
-                      ))}
-                      {tests.length === 0 && (
-                        <option value="exam-test-1">Test 1 On The Go (IELTS)</option>
-                      )}
-                    </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
-                      <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                        <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
-                      </svg>
+
+                  <div className="space-y-1.5">
+                    <label htmlFor="reg-name" className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Họ và tên thí sinh
+                    </label>
+                    <div className="relative">
+                      <User size={16} className="absolute left-3.5 top-3.5 text-slate-400" />
+                      <input
+                        id="reg-name"
+                        type="text"
+                        placeholder="Nhập đầy đủ Họ tên..."
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-850 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium"
+                        required
+                      />
                     </div>
                   </div>
-                )}
-              </div>
 
-              <div className="space-y-1.5">
-                <label htmlFor="reg-name" className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Họ và tên thí sinh
-                </label>
-                <div className="relative">
-                  <User size={16} className="absolute left-3.5 top-3.5 text-slate-400" />
-                  <input
-                    id="reg-name"
-                    type="text"
-                    placeholder="Nhập đầy đủ Họ tên..."
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-850 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium"
-                    required
-                  />
-                </div>
-              </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="reg-phone" className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Số điện thoại
+                    </label>
+                    <div className="relative">
+                      <Phone size={16} className="absolute left-3.5 top-3.5 text-slate-400" />
+                      <input
+                        id="reg-phone"
+                        type="tel"
+                        placeholder="Nhập số điện thoại dự thi..."
+                        value={phoneNumber}
+                        onChange={(e) => setPhoneNumber(e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-850 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium"
+                        required
+                      />
+                    </div>
+                  </div>
 
-              <div className="space-y-1.5">
-                <label htmlFor="reg-phone" className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Số điện thoại
-                </label>
-                <div className="relative">
-                  <Phone size={16} className="absolute left-3.5 top-3.5 text-slate-400" />
-                  <input
-                    id="reg-phone"
-                    type="tel"
-                    placeholder="Nhập số điện thoại dự thi..."
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-850 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium"
-                    required
-                  />
-                </div>
-              </div>
+                  {error && (
+                    <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-150 dark:border-red-900/30 text-red-600 dark:text-red-400 rounded-xl text-xs font-semibold flex items-center gap-2 animate-shake">
+                      <AlertCircle size={14} className="shrink-0" />
+                      <span>{error}</span>
+                    </div>
+                  )}
 
-              {error && (
-                <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-150 dark:border-red-900/30 text-red-600 dark:text-red-400 rounded-xl text-xs font-semibold flex items-center gap-2 animate-shake">
-                  <AlertCircle size={14} className="shrink-0" />
-                  <span>{error}</span>
-                </div>
-              )}
+                  <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                    <button
+                      id="start-test-btn"
+                      type="submit"
+                      disabled={loading}
+                      className="flex-1 py-3 text-white font-bold text-sm rounded-xl shadow-md transition-all hover:scale-102 active:scale-98 cursor-pointer flex items-center justify-center gap-1.5"
+                      style={brandBgStyle}
+                    >
+                      {loading ? "Đang xử lý..." : "BẮT ĐẦU LÀM BÀI"}
+                      <ArrowRight size={15} />
+                    </button>
 
-              <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                <button
-                  id="start-test-btn"
-                  type="submit"
-                  disabled={loading}
-                  className="flex-1 py-3 text-white font-bold text-sm rounded-xl shadow-md transition-all hover:scale-102 active:scale-98 cursor-pointer flex items-center justify-center gap-1.5"
-                  style={brandBgStyle}
-                >
-                  {loading ? "Đang xử lý..." : "BẮT ĐẦU LÀM BÀI"}
-                  <ArrowRight size={15} />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setShowTeacherModal(true)}
-                  id="contact-teacher-btn"
-                  className="py-3 px-5 border-2 font-bold text-sm rounded-xl transition cursor-pointer active:scale-95 flex items-center justify-center gap-1.5 bg-transparent"
-                  style={{ borderColor: brandBgColor, color: brandBgColor }}
-                >
-                  <PhoneCall size={14} />
-                  CONTACT TO TEACHER
-                </button>
-              </div>
-            </form>
+                    <button
+                      type="button"
+                      onClick={() => setShowTeacherModal(true)}
+                      id="contact-teacher-btn"
+                      className="py-3 px-5 border-2 font-bold text-sm rounded-xl transition cursor-pointer active:scale-95 flex items-center justify-center gap-1.5 bg-transparent"
+                      style={{ borderColor: brandBgColor, color: brandBgColor }}
+                    >
+                      <PhoneCall size={14} />
+                      CONTACT TO TEACHER
+                    </button>
+                  </div>
+                </form>
+              </>
+            )}
           </div>
         </div>
       </main>
@@ -332,18 +399,94 @@ export default function HomeView({
             className="fixed inset-0 bg-black/45 backdrop-blur-sm"
             onClick={() => setShowTeacherModal(false)}
           />
-          <div className="relative bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6 w-full max-w-sm space-y-4 animate-slide-in">
-            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+          <div className="relative bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6 w-full max-w-md space-y-4 animate-slide-in overflow-y-auto max-h-[90vh]">
+            <h3 className="text-lg font-bold text-slate-850 dark:text-slate-100 flex items-center gap-2">
               <Phone size={18} className="text-indigo-600" style={brandTextStyle} />
               Thông tin liên hệ Giáo viên
             </h3>
             <p className="text-xs text-slate-500">
-              Vui lòng gọi trực tiếp cho giáo viên quản lý phòng thi nếu bạn gặp trục trặc kỹ thuật hoặc sự cố đăng ký.
+              Bạn có thể sử dụng các liên kết tương tác dưới đây để liên hệ trực tiếp với giáo viên quản lý phòng thi.
             </p>
-            <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-xl text-center border border-slate-150 dark:border-slate-700">
-              <p className="text-xs font-bold text-slate-450 uppercase tracking-wider">SỐ ĐIỆN THOẠI GIÁO VIÊN</p>
-              <p className="text-2xl font-black font-mono mt-1" style={brandTextStyle}>0912 345 678</p>
+            
+            <div className="p-4 bg-slate-50 dark:bg-slate-800/45 rounded-xl border border-slate-150 dark:border-slate-800 space-y-3">
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">ĐƠN VỊ / GIÁO VIÊN CHỦ QUẢN</p>
+                <p className="text-sm font-extrabold text-slate-800 dark:text-slate-100 mt-0.5">{globalSettings.contactName || "Conquer English Center"}</p>
+              </div>
+              {globalSettings.contactAddress && (
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                    <MapPin size={10} /> ĐỊA CHỈ
+                  </p>
+                  <p className="text-xs font-semibold text-slate-650 dark:text-slate-300 mt-0.5">{globalSettings.contactAddress}</p>
+                </div>
+              )}
             </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {/* Call */}
+              <a
+                href={`tel:${globalSettings.contactPhone || "0912 345 678"}`}
+                className="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition text-center flex items-center justify-center gap-1.5"
+              >
+                <PhoneCall size={13} />
+                Gọi Điện
+              </a>
+              {/* SMS */}
+              <a
+                href={`sms:${globalSettings.contactPhone || "0912 345 678"}`}
+                className="py-2.5 px-4 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-xl transition text-center flex items-center justify-center gap-1.5"
+              >
+                <MessageSquare size={13} />
+                Gửi SMS
+              </a>
+              {/* Zalo */}
+              <a
+                href={`https://zalo.me/${globalSettings.contactZalo || globalSettings.contactPhone || "0912 345 678"}`}
+                target="_blank"
+                rel="noreferrer"
+                className="py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition text-center flex items-center justify-center gap-1.5"
+              >
+                <Phone size={13} />
+                Zalo Chat
+              </a>
+              {/* Email */}
+              <a
+                href={`mailto:${globalSettings.contactEmail || "info@conquerenglish.edu.vn"}`}
+                className="py-2.5 px-4 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition text-center flex items-center justify-center gap-1.5"
+              >
+                <Mail size={13} />
+                Gửi Email
+              </a>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {/* Facebook */}
+              {globalSettings.contactFacebook && (
+                <a
+                  href={globalSettings.contactFacebook}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="py-2.5 px-4 bg-blue-800 hover:bg-blue-900 text-white text-xs font-bold rounded-xl transition text-center flex items-center justify-center gap-1.5"
+                >
+                  <Facebook size={13} />
+                  Facebook
+                </a>
+              )}
+              {/* Website */}
+              {globalSettings.contactWebsite && (
+                <a
+                  href={globalSettings.contactWebsite}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition text-center flex items-center justify-center gap-1.5"
+                >
+                  <Globe size={13} />
+                  Trang Web
+                </a>
+              )}
+            </div>
+
             <button
               onClick={() => setShowTeacherModal(false)}
               id="teacher-close-btn"

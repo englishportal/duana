@@ -49,7 +49,7 @@ export async function registerOrResumeCandidate(
     const candidate = { id: docSnap.id, ...docSnap.data() } as Candidate;
 
     if (candidate.status === 'COMPLETED') {
-      const error: any = new Error('Số điện thoại này đã hoàn thành bài thi này trước đó. Mỗi thí sinh chỉ được làm bài duy nhất 1 lần.');
+      const error: any = new Error('You have already completed this exam.');
       error.status = 'COMPLETED';
       throw error;
     } else {
@@ -276,23 +276,73 @@ export async function resetCandidateStatus(id: string): Promise<Candidate> {
     throw new Error('Không tìm thấy thí sinh.');
   }
 
-  await updateDoc(docRef, {
-    status: 'IN_PROGRESS',
-    endTime: null,
-  });
+  const currentData = docSnap.data() as Candidate;
 
-  // Try to remove from results collection so they can re-submit
+  // Clone current completed candidate as a historical attempt to preserve history
+  if (currentData.status === 'COMPLETED') {
+    const timestamp = Date.now();
+    const histId = `${id}_hist_${timestamp}`;
+    const histRef = doc(db, CANDIDATES_COLLECTION, histId);
+
+    const historicalCandidate = {
+      ...currentData,
+      id: histId,
+      fullName: `${currentData.fullName} (Lượt 1)`,
+      phoneNumber: `${currentData.phoneNumber}_hist_${timestamp}`,
+      isHistory: true
+    };
+
+    try {
+      await setDoc(histRef, historicalCandidate);
+    } catch (err) {
+      console.error('Error saving historical candidate on reset:', err);
+    }
+
+    // Clone matching results document too
+    try {
+      const activeResultRef = doc(db, 'results', id);
+      const activeResultSnap = await getDoc(activeResultRef);
+      if (activeResultSnap.exists()) {
+        const resultData = activeResultSnap.data();
+        const histResultRef = doc(db, 'results', histId);
+        await setDoc(histResultRef, {
+          ...resultData,
+          id: histId,
+          fullName: `${resultData.fullName} (Lượt 1)`,
+          phoneNumber: `${resultData.phoneNumber}_hist_${timestamp}`,
+          isHistory: true
+        });
+      }
+    } catch (err) {
+      console.error('Error cloning results to history on reset:', err);
+    }
+  }
+
+  // Reset active candidate fields for fresh new attempt
+  const freshCandidateUpdate = {
+    status: 'IN_PROGRESS' as const,
+    answers: {},
+    speakingFiles: {},
+    tabViolations: 0,
+    durationSeconds: 0,
+    endTime: null,
+    startTime: new Date().toISOString(),
+    writingGrades: {},
+  };
+
+  await updateDoc(docRef, freshCandidateUpdate);
+
+  // Try to remove active result so they can re-submit
   try {
     await deleteDoc(doc(db, 'results', id));
   } catch (err) {
-    console.error('Error removing from results collection on reset:', err);
+    console.error('Error removing active results on reset:', err);
   }
 
   return {
     id,
-    ...(docSnap.data() as Candidate),
-    status: 'IN_PROGRESS',
-    endTime: null,
+    ...currentData,
+    ...freshCandidateUpdate,
   };
 }
 

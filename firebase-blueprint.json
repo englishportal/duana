@@ -6,7 +6,14 @@
       "type": "object",
       "properties": {
         "backgroundColor": { "type": "string" },
-        "logoUrl": { "type": "string" }
+        "logoUrl": { "type": "string" },
+        "contactName": { "type": "string" },
+        "contactPhone": { "type": "string" },
+        "contactEmail": { "type": "string" },
+        "contactZalo": { "type": "string" },
+        "contactFacebook": { "type": "string" },
+        "contactWebsite": { "type": "string" },
+        "contactAddress": { "type": "string" }
       },
       "required": ["backgroundColor", "logoUrl"]
     },

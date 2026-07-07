@@ -655,7 +655,7 @@ export default function PlacementTest({
                             <span className="font-mono font-bold text-[#002147] dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 px-1.5 py-0.5 rounded text-[11px]">(8)</span>
                             <input
                               type="text"
-                              placeholder="Available date"
+                              placeholder="8"
                               value={answers.l2_1 || ""}
                               onChange={(e) => updateAnswer("l2_1", e.target.value)}
                               className="px-2.5 py-1 text-xs border-b border-slate-350 dark:border-slate-700 bg-transparent outline-none focus:border-indigo-500 font-bold text-indigo-600 dark:text-indigo-400 w-36"
@@ -667,7 +667,7 @@ export default function PlacementTest({
                             <span className="font-mono font-bold text-[#002147] dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 px-1.5 py-0.5 rounded text-[11px]">(9)</span>
                             <input
                               type="text"
-                              placeholder="Rent amount"
+                              placeholder="9"
                               value={answers.l2_2 || ""}
                               onChange={(e) => updateAnswer("l2_2", e.target.value)}
                               className="px-2.5 py-1 text-xs border-b border-slate-350 dark:border-slate-700 bg-transparent outline-none focus:border-indigo-500 font-bold text-indigo-600 dark:text-indigo-400 w-32"
@@ -685,7 +685,7 @@ export default function PlacementTest({
                             <span className="font-mono font-bold text-[#002147] dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 px-1.5 py-0.5 rounded text-[11px]">(10)</span>
                             <input
                               type="text"
-                              placeholder="Credit check fee"
+                              placeholder="10"
                               value={answers.l2_3 || ""}
                               onChange={(e) => updateAnswer("l2_3", e.target.value)}
                               className="px-2.5 py-1 text-xs border-b border-slate-350 dark:border-slate-700 bg-transparent outline-none focus:border-indigo-500 font-bold text-indigo-600 dark:text-indigo-400 w-24"
@@ -710,7 +710,7 @@ export default function PlacementTest({
                             <span className="font-mono font-bold text-[#002147] dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 px-1.5 py-0.5 rounded text-[11px]">(11)</span>
                             <input
                               type="text"
-                              placeholder="Remodelled room"
+                              placeholder="11"
                               value={answers.l2_4 || ""}
                               onChange={(e) => updateAnswer("l2_4", e.target.value)}
                               className="px-2.5 py-1 text-xs border-b border-slate-350 dark:border-slate-700 bg-transparent outline-none focus:border-indigo-500 font-bold text-indigo-600 dark:text-indigo-400 w-36"
@@ -722,7 +722,7 @@ export default function PlacementTest({
                             <span className="font-mono font-bold text-[#002147] dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 px-1.5 py-0.5 rounded text-[11px]">(12)</span>
                             <input
                               type="text"
-                              placeholder="Missing appliance"
+                              placeholder="12"
                               value={answers.l2_5 || ""}
                               onChange={(e) => updateAnswer("l2_5", e.target.value)}
                               className="px-2.5 py-1 text-xs border-b border-slate-350 dark:border-slate-700 bg-transparent outline-none focus:border-indigo-500 font-bold text-indigo-600 dark:text-indigo-400 w-36"
@@ -734,7 +734,7 @@ export default function PlacementTest({
                             <span className="font-mono font-bold text-[#002147] dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 px-1.5 py-0.5 rounded text-[11px]">(13)</span>
                             <input
                               type="text"
-                              placeholder="Parking area"
+                              placeholder="13"
                               value={answers.l2_6 || ""}
                               onChange={(e) => updateAnswer("l2_6", e.target.value)}
                               className="px-2.5 py-1 text-xs border-b border-slate-350 dark:border-slate-700 bg-transparent outline-none focus:border-indigo-500 font-bold text-indigo-600 dark:text-indigo-400 w-36"
@@ -755,7 +755,7 @@ export default function PlacementTest({
                             <span className="font-mono font-bold text-[#002147] dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 px-1.5 py-0.5 rounded text-[11px]">(14)</span>
                             <input
                               type="text"
-                              placeholder="Garden duty"
+                              placeholder="14"
                               value={answers.l2_7 || ""}
                               onChange={(e) => updateAnswer("l2_7", e.target.value)}
                               className="px-2.5 py-1 text-xs border-b border-slate-350 dark:border-slate-700 bg-transparent outline-none focus:border-indigo-500 font-bold text-indigo-600 dark:text-indigo-400 w-32"
@@ -768,7 +768,7 @@ export default function PlacementTest({
                             <span className="font-mono font-bold text-[#002147] dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 px-1.5 py-0.5 rounded text-[11px]">(15)</span>
                             <input
                               type="text"
-                              placeholder="Utility service"
+                              placeholder="15"
                               value={answers.l2_8 || ""}
                               onChange={(e) => updateAnswer("l2_8", e.target.value)}
                               className="px-2.5 py-1 text-xs border-b border-slate-350 dark:border-slate-700 bg-transparent outline-none focus:border-indigo-500 font-bold text-indigo-600 dark:text-indigo-400 w-32"
@@ -793,7 +793,7 @@ export default function PlacementTest({
                             <span className="font-mono font-bold text-[#002147] dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 px-1.5 py-0.5 rounded text-[11px]">(16)</span>
                             <input
                               type="text"
-                              placeholder="AC type"
+                              placeholder="16"
                               value={answers.l2_9 || ""}
                               onChange={(e) => updateAnswer("l2_9", e.target.value)}
                               className="px-2.5 py-1 text-xs border-b border-slate-350 dark:border-slate-700 bg-transparent outline-none focus:border-indigo-500 font-bold text-indigo-600 dark:text-indigo-400 w-32"
@@ -806,7 +806,7 @@ export default function PlacementTest({
                             <span className="font-mono font-bold text-[#002147] dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 px-1.5 py-0.5 rounded text-[11px]">(17)</span>
                             <input
                               type="text"
-                              placeholder="Surname"
+                              placeholder="17"
                               value={answers.l2_10 || ""}
                               onChange={(e) => updateAnswer("l2_10", e.target.value)}
                               className="px-2.5 py-1 text-xs border-b border-slate-350 dark:border-slate-700 bg-transparent outline-none focus:border-indigo-500 font-bold text-indigo-600 dark:text-indigo-400 w-32"

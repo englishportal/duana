@@ -30,7 +30,14 @@ service cloud.firestore {
 
     function isValidGlobalSettings(data) {
       return data.backgroundColor is string && data.backgroundColor.size() <= 32
-          && data.logoUrl is string && data.logoUrl.size() <= 2048;
+          && data.logoUrl is string && data.logoUrl.size() <= 2048
+          && (!data.keys().hasAny(['contactName']) || (data.contactName is string && data.contactName.size() <= 512))
+          && (!data.keys().hasAny(['contactPhone']) || (data.contactPhone is string && data.contactPhone.size() <= 128))
+          && (!data.keys().hasAny(['contactEmail']) || (data.contactEmail is string && data.contactEmail.size() <= 256))
+          && (!data.keys().hasAny(['contactZalo']) || (data.contactZalo is string && data.contactZalo.size() <= 128))
+          && (!data.keys().hasAny(['contactFacebook']) || (data.contactFacebook is string && data.contactFacebook.size() <= 1024))
+          && (!data.keys().hasAny(['contactWebsite']) || (data.contactWebsite is string && data.contactWebsite.size() <= 1024))
+          && (!data.keys().hasAny(['contactAddress']) || (data.contactAddress is string && data.contactAddress.size() <= 1024));
     }
 
     function isValidExam(data) {

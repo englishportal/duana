@@ -29,9 +29,10 @@ import {
   FolderOpen
 } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
-import { loginAdmin, logoutAdmin, getCurrentAdminToken } from "../services/auth";
+import { loginAdmin, logoutAdmin, getCurrentAdminToken, isFirstRun, setupAdmin, changeAdminPassword } from "../services/auth";
 import { getGlobalSettings, updateGlobalSettings } from "../services/settingsService";
 import { getAdminExams, createExam, updateExam, deleteExam } from "../services/examService";
+import { getMaterials, addMaterial, deleteMaterial, Material } from "../services/materialService";
 import {
   getCandidatesAdminList,
   getCandidateDetails,
@@ -46,7 +47,9 @@ import {
   LISTENING_PART_2,
   GRAMMAR_QUESTIONS,
   VOCABULARY_QUESTIONS,
-  READING_PASSAGE
+  READING_PASSAGE,
+  SPEAKING_PART_1,
+  SPEAKING_PART_2
 } from "../data/questions";
 
 // Static Placement Test Scorer for backward-compatibility
@@ -164,26 +167,65 @@ export default function AdminPanel({ isDarkMode, onThemeToggle, onClose, onLogin
   const [tests, setTests] = useState<any[]>([]);
   const [selectedCandidate, setSelectedCandidate] = useState<any | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [candidateExamFilter, setCandidateExamFilter] = useState("all");
   const [loginLoading, setLoginLoading] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // First run state
+  const [isFirstAdminRun, setIsFirstAdminRun] = useState(false);
+  const [newAdminPassword, setNewAdminPassword] = useState("");
+  const [confirmAdminPassword, setConfirmAdminPassword] = useState("");
+
+  // Materials states
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [materialForm, setMaterialForm] = useState<Partial<Material>>({
+    title: "",
+    type: "pdf",
+    url: "",
+    description: ""
+  });
+  const [materialFormOpen, setMaterialFormOpen] = useState(false);
+  const [materialsSaving, setMaterialsSaving] = useState(false);
+
+  // CEFR Stats States
+  const [selectedStatsTestId, setSelectedStatsTestId] = useState("all");
+
+  // Change Password state
+  const [changePasswordForm, setChangePasswordForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: ""
+  });
+  const [passwordChangeSaving, setPasswordChangeSaving] = useState(false);
 
   // Full-screen answers modal states
   const [showFullScreenAnswers, setShowFullScreenAnswers] = useState(false);
   const [ansFilter, setAnsFilter] = useState("all");
   const [sectionFilter, setSectionFilter] = useState("all");
 
-  // Tab State: "candidates", "tests", "settings"
-  const [activeTab, setActiveTab] = useState<"candidates" | "tests" | "settings">("candidates");
+  // Tab State: "candidates" | "tests" | "materials" | "settings"
+  const [activeTab, setActiveTab] = useState<"candidates" | "tests" | "materials" | "settings">("candidates");
 
   // Global branding settings
-  const [globalSettings, setGlobalSettings] = useState({ backgroundColor: "#002147", logoUrl: "", externalApiUrl: "" });
+  const [globalSettings, setGlobalSettings] = useState<any>({
+    backgroundColor: "#002147",
+    logoUrl: "",
+    externalApiUrl: "",
+    contactName: "",
+    contactPhone: "",
+    contactEmail: "",
+    contactZalo: "",
+    contactFacebook: "",
+    contactWebsite: "",
+    contactAddress: ""
+  });
   const [settingsSaving, setSettingsSaving] = useState(false);
 
   // Custom toast and confirm modal states
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
-    type: "reset_session" | "delete_candidate" | "delete_test";
+    type: "reset_session" | "delete_candidate" | "delete_test" | "delete_material";
     title: string;
     description: string;
     targetId: string;
@@ -295,6 +337,14 @@ export default function AdminPanel({ isDarkMode, onThemeToggle, onClose, onLogin
       } catch (err: any) {
         showToast(err.message || "Không thể xóa đề thi.", "error");
       }
+    } else if (type === "delete_material") {
+      try {
+        await deleteMaterial(targetId);
+        showToast("Đã xóa tài liệu học tập thành công!", "success");
+        fetchAdminData();
+      } catch (err: any) {
+        showToast(err.message || "Không thể xóa tài liệu.", "error");
+      }
     }
   };
 
@@ -343,6 +393,10 @@ export default function AdminPanel({ isDarkMode, onThemeToggle, onClose, onLogin
   };
 
   useEffect(() => {
+    isFirstRun().then((firstRun) => {
+      setIsFirstAdminRun(firstRun);
+    });
+
     getCurrentAdminToken().then((token) => {
       if (token) {
         setIsLoggedIn(true);
@@ -363,9 +417,7 @@ export default function AdminPanel({ isDarkMode, onThemeToggle, onClose, onLogin
   const fetchBranding = () => {
     getGlobalSettings()
       .then((data) => {
-        if (data.backgroundColor) {
-          setGlobalSettings(data);
-        }
+        setGlobalSettings(data);
       })
       .catch((err) => console.error("Error loading branding settings:", err));
   };
@@ -427,6 +479,10 @@ export default function AdminPanel({ isDarkMode, onThemeToggle, onClose, onLogin
       });
       setCandidates(listData);
       setTests(testsData);
+
+      // Fetch study materials
+      const materialsData = await getMaterials();
+      setMaterials(materialsData);
     } catch (err) {
       console.error("Error fetching admin metrics:", err);
     } finally {
@@ -542,10 +598,37 @@ export default function AdminPanel({ isDarkMode, onThemeToggle, onClose, onLogin
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setImageMimeType(file.type);
+    setImageMimeType("image/jpeg");
     const reader = new FileReader();
-    reader.onloadend = () => {
-      setSelectedImageBase64(reader.result as string);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 1200;
+        let width = img.width;
+        let height = img.height;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedBase64 = canvas.toDataURL("image/jpeg", 0.85);
+          setSelectedImageBase64(compressedBase64);
+          setImageMimeType("image/jpeg");
+        } else {
+          setSelectedImageBase64(event.target?.result as string);
+        }
+      };
+      img.src = event.target?.result as string;
     };
     reader.readAsDataURL(file);
   };
@@ -666,17 +749,162 @@ export default function AdminPanel({ isDarkMode, onThemeToggle, onClose, onLogin
     return `${mins}m ${rSecs}s`;
   };
 
-  const filteredCandidates = candidates.filter(
-    (c) =>
+  const handleFirstRunSetup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAdminPassword) {
+      showToast("Vui lòng nhập mật khẩu quản trị mới", "error");
+      return;
+    }
+    if (newAdminPassword !== confirmAdminPassword) {
+      showToast("Mật khẩu xác nhận không khớp", "error");
+      return;
+    }
+    setLoginLoading(true);
+    try {
+      await setupAdmin(newAdminPassword);
+      showToast("Khởi tạo tài khoản quản trị thành công! Vui lòng đăng nhập với mật khẩu mới.", "success");
+      setIsFirstAdminRun(false);
+      setPassword(newAdminPassword);
+    } catch (err: any) {
+      showToast(err.message || "Lỗi khởi tạo tài khoản.", "error");
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleSaveMaterial = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!materialForm.title || !materialForm.url) {
+      showToast("Vui lòng nhập đầy đủ tiêu đề và liên kết học tập", "error");
+      return;
+    }
+    setMaterialsSaving(true);
+    try {
+      await addMaterial(materialForm as Omit<Material, "id">);
+      showToast("Đã thêm tài liệu học tập mới thành công!", "success");
+      setMaterialForm({ title: "", type: "pdf", url: "", description: "" });
+      setMaterialFormOpen(false);
+      fetchAdminData();
+    } catch (err: any) {
+      showToast(err.message || "Không thể lưu tài liệu.", "error");
+    } finally {
+      setMaterialsSaving(false);
+    }
+  };
+
+  const handleDeleteMaterialTrigger = (materialId: string, title: string) => {
+    setConfirmModal({
+      isOpen: true,
+      type: "delete_material",
+      title: "Xóa tài liệu học tập",
+      description: `Tài liệu "${title}" sẽ bị xóa vĩnh viễn khỏi danh sách bài tự học của học sinh. Thầy cô chắc chắn muốn thực hiện?`,
+      targetId: materialId,
+      actionLabel: "XÁC NHẬN XÓA",
+      actionClass: "bg-red-600 hover:bg-red-750 text-white"
+    });
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!changePasswordForm.currentPassword || !changePasswordForm.newPassword) {
+      showToast("Vui lòng điền đầy đủ các trường mật khẩu", "error");
+      return;
+    }
+    if (changePasswordForm.newPassword !== changePasswordForm.confirmPassword) {
+      showToast("Mật khẩu xác nhận không khớp", "error");
+      return;
+    }
+    setPasswordChangeSaving(true);
+    try {
+      await changeAdminPassword(changePasswordForm.currentPassword, changePasswordForm.newPassword);
+      showToast("Thay đổi mật khẩu quản trị thành công!", "success");
+      setChangePasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+    } catch (err: any) {
+      showToast(err.message || "Có lỗi xảy ra khi đổi mật khẩu.", "error");
+    } finally {
+      setPasswordChangeSaving(false);
+    }
+  };
+
+  const filteredCandidates = candidates.filter((c) => {
+    const matchSearch =
       c.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.phoneNumber.includes(searchQuery)
-  );
+      c.phoneNumber.includes(searchQuery);
+    const matchExam = candidateExamFilter === "all" || c.testId === candidateExamFilter;
+    return matchSearch && matchExam;
+  });
 
   const brandBgColor = globalSettings.backgroundColor || "#002147";
   const brandBgStyle = { backgroundColor: brandBgColor };
   const brandTextStyle = { color: brandBgColor };
 
   if (!isLoggedIn) {
+    if (isFirstAdminRun) {
+      return (
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col justify-center items-center px-4 transition-colors duration-200">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-8 space-y-6">
+            <div className="text-center space-y-2">
+              <div className="inline-flex p-3 rounded-full bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400">
+                <Sparkles size={32} className="animate-bounce" />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">KHỞI TẠO QUẢN TRỊ VIÊN</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Chào mừng thầy cô! Đây là lần đầu tiên hệ thống hoạt động. Vui lòng thiết lập mật khẩu Admin an toàn cho phòng thi.
+              </p>
+            </div>
+
+            <form onSubmit={handleFirstRunSetup} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                  MẬT KHẨU ADMIN MỚI
+                </label>
+                <input
+                  type="password"
+                  placeholder="Nhập ít nhất 6 ký tự..."
+                  value={newAdminPassword}
+                  onChange={(e) => setNewAdminPassword(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                  XÁC NHẬN MẬT KHẨU ADMIN
+                </label>
+                <input
+                  type="password"
+                  placeholder="Nhập lại mật khẩu trên..."
+                  value={confirmAdminPassword}
+                  onChange={(e) => setConfirmAdminPassword(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loginLoading}
+                className="w-full py-3 text-white font-bold rounded-xl shadow-md transition active:scale-95 cursor-pointer disabled:opacity-50"
+                style={brandBgStyle}
+              >
+                {loginLoading ? "Đang khởi tạo..." : "KÍCH HOẠT HỆ THỐNG"}
+              </button>
+            </form>
+
+            <div className="text-center pt-2">
+              <button
+                onClick={onClose}
+                className="text-xs text-slate-500 hover:underline cursor-pointer"
+              >
+                Quay lại Trang Chủ
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col justify-center items-center px-4 transition-colors duration-200">
         <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-8 space-y-6">
@@ -810,7 +1038,18 @@ export default function AdminPanel({ isDarkMode, onThemeToggle, onClose, onLogin
               }`}
             >
               <FileText size={15} />
-              Cấu hình Đề thi
+              Quản lý Đề thi & Thống kê
+            </button>
+            <button
+              onClick={() => setActiveTab("materials")}
+              className={`py-4 px-2 text-xs font-bold uppercase tracking-wider border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+                activeTab === "materials"
+                  ? "border-indigo-650 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400"
+                  : "border-transparent text-slate-500 hover:text-slate-850"
+              }`}
+            >
+              <BookOpen size={15} />
+              Tài liệu học tập
             </button>
             <button
               onClick={() => setActiveTab("settings")}
@@ -821,7 +1060,7 @@ export default function AdminPanel({ isDarkMode, onThemeToggle, onClose, onLogin
               }`}
             >
               <Settings size={15} />
-              Cài đặt Hệ thống
+              Cấu hình Hệ thống
             </button>
           </div>
         </div>
@@ -1007,36 +1246,75 @@ export default function AdminPanel({ isDarkMode, onThemeToggle, onClose, onLogin
 
                   <div className="space-y-5 max-h-[500px] overflow-y-auto pr-2">
                     {/* Speaking Passage */}
-                    <div className="p-4 bg-slate-50/55 dark:bg-slate-900/35 border border-slate-150 dark:border-slate-800/80 rounded-xl space-y-3">
-                      <p className="text-xs font-extrabold text-indigo-600 dark:text-indigo-400">Task 1: Đọc đoạn văn thành tiếng (Passage)</p>
-                      <blockquote className="p-3 bg-white dark:bg-slate-950 rounded-lg border border-slate-100 dark:border-slate-800 italic text-xs leading-relaxed text-slate-650 dark:text-slate-300">
-                        &ldquo;A smart student talked about his fast project on the local forests. It has quickly collected key facts to support basic reports.&rdquo;
-                      </blockquote>
-                      {selectedCandidate.speakingFiles?.passage ? (
-                        <div className="space-y-2">
-                          <p className="text-[10px] text-emerald-600 font-bold">✓ Đã nộp file ghi âm giọng đọc</p>
-                          <audio src={selectedCandidate.speakingFiles.passage} controls className="w-full h-8" />
+                    {(() => {
+                      const levelId = selectedCandidate.answers?.speaking_level || "medium";
+                      const activeLvl = SPEAKING_PART_1.levels.find(l => l.id === levelId) || SPEAKING_PART_1.levels[1];
+                      const passageAudio = selectedCandidate.speakingFiles?.s1_1 || selectedCandidate.speakingFiles?.passage;
+
+                      return (
+                        <div className="p-4 bg-slate-50/55 dark:bg-slate-900/35 border border-slate-150 dark:border-slate-800/80 rounded-xl space-y-3">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                            <p className="text-xs font-extrabold text-indigo-600 dark:text-indigo-400">
+                              Task 1: Đọc đoạn văn thành tiếng (Passage)
+                            </p>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-100/30">
+                              Mức: {activeLvl.name} ({activeLvl.difficulty})
+                            </span>
+                          </div>
+                          
+                          <div className="text-xs space-y-1 text-slate-500">
+                            <p className="font-semibold text-slate-600 dark:text-slate-450">Đoạn văn học sinh nhận được:</p>
+                            <blockquote className="p-3 bg-white dark:bg-slate-950 rounded-lg border border-slate-100 dark:border-slate-800 italic text-xs leading-relaxed text-slate-650 dark:text-slate-300">
+                              &ldquo;{activeLvl.passage}&rdquo;
+                            </blockquote>
+                          </div>
+
+                          {passageAudio ? (
+                            <div className="space-y-2">
+                              <p className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
+                                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                ✓ Đã nộp file ghi âm giọng đọc
+                              </p>
+                              <audio src={passageAudio} controls className="w-full h-8" />
+                            </div>
+                          ) : (
+                            <p className="text-xs text-red-400 italic">Thí sinh chưa nộp ghi âm câu này.</p>
+                          )}
                         </div>
-                      ) : (
-                        <p className="text-xs text-red-400 italic">Thí sinh chưa nộp ghi âm câu này.</p>
-                      )}
-                    </div>
+                      );
+                    })()}
 
                     {/* Interview Audio */}
-                    <div className="p-4 bg-slate-50/55 dark:bg-slate-900/35 border border-slate-150 dark:border-slate-800/80 rounded-xl space-y-3">
-                      <p className="text-xs font-extrabold text-indigo-600 dark:text-indigo-400">Task 2: Phỏng vấn nói tự do (Interview)</p>
-                      <div className="text-xs space-y-1 text-slate-500">
-                        <p className="font-semibold">Câu hỏi phỏng vấn:</p>
-                        <p className="italic">&ldquo;How do you think using a dictionary or dynamic search affects student language learning habits?&rdquo;</p>
+                    <div className="p-4 bg-slate-50/55 dark:bg-slate-900/35 border border-slate-150 dark:border-slate-800/80 rounded-xl space-y-4">
+                      <p className="text-xs font-extrabold text-indigo-600 dark:text-indigo-400 border-b border-slate-100 dark:border-slate-800 pb-1.5">
+                        Task 2: Trả lời 3 câu hỏi phỏng vấn (Interview)
+                      </p>
+                      
+                      <div className="space-y-4">
+                        {SPEAKING_PART_2.questions.map((q, idx) => {
+                          const qAudio = selectedCandidate.speakingFiles?.[q.id] || (idx === 0 ? selectedCandidate.speakingFiles?.interview : undefined);
+                          return (
+                            <div key={q.id} className="p-3 bg-white dark:bg-slate-950/50 rounded-xl border border-slate-100 dark:border-slate-800/70 space-y-2.5">
+                              <div className="text-xs">
+                                <p className="font-bold text-slate-700 dark:text-slate-300">Câu hỏi {idx + 1}:</p>
+                                <p className="italic text-slate-600 dark:text-slate-400 font-medium">&ldquo;{q.text}&rdquo;</p>
+                              </div>
+
+                              {qAudio ? (
+                                <div className="space-y-1">
+                                  <p className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
+                                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                    ✓ Đã nộp file ghi âm câu trả lời
+                                  </p>
+                                  <audio src={qAudio} controls className="w-full h-8" />
+                                </div>
+                              ) : (
+                                <p className="text-[11px] text-red-400 italic">Thí sinh chưa nộp ghi âm câu này.</p>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
-                      {selectedCandidate.speakingFiles?.interview ? (
-                        <div className="space-y-2">
-                          <p className="text-[10px] text-emerald-600 font-bold">✓ Đã nộp file ghi âm phỏng vấn tự do</p>
-                          <audio src={selectedCandidate.speakingFiles.interview} controls className="w-full h-8" />
-                        </div>
-                      ) : (
-                        <p className="text-xs text-red-400 italic">Thí sinh chưa nộp ghi âm phỏng vấn.</p>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -1388,7 +1666,7 @@ export default function AdminPanel({ isDarkMode, onThemeToggle, onClose, onLogin
             {/* Candidate List Container */}
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
               <div className="p-5 border-b border-slate-150 dark:border-slate-800 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div className="flex flex-1 items-center gap-2 max-w-xl">
+                <div className="flex flex-col sm:flex-row flex-1 items-stretch sm:items-center gap-3 max-w-2xl">
                   <div className="relative flex-1">
                     <Search size={16} className="absolute left-3.5 top-3.5 text-slate-400" />
                     <input
@@ -1400,6 +1678,19 @@ export default function AdminPanel({ isDarkMode, onThemeToggle, onClose, onLogin
                       className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
                     />
                   </div>
+
+                  <select
+                    value={candidateExamFilter}
+                    onChange={(e) => setCandidateExamFilter(e.target.value)}
+                    className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-350 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="all">Tất cả kỳ thi</option>
+                    <option value="exam-test-1">IELTS Placement</option>
+                    {tests.map(t => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </select>
+
                   <button
                     onClick={() => {
                       fetchAdminData();
@@ -1409,9 +1700,12 @@ export default function AdminPanel({ isDarkMode, onThemeToggle, onClose, onLogin
                   >
                     TÌM KIẾM
                   </button>
-                  {searchQuery && (
+                  {(searchQuery || candidateExamFilter !== "all") && (
                     <button
-                      onClick={() => setSearchQuery("")}
+                      onClick={() => {
+                        setSearchQuery("");
+                        setCandidateExamFilter("all");
+                      }}
                       className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-600 dark:text-slate-400 font-extrabold text-xs tracking-wider rounded-xl shadow-sm transition active:scale-95 cursor-pointer"
                     >
                       RESET

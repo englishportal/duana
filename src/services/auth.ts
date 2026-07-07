@@ -1,75 +1,83 @@
-import { signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../firebase';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 
-const ADMIN_EMAIL = 'admin@conquerenglish.com';
-const ALLOWED_LOCAL_PASSWORDS = ['conquerenglish', 'conquerenglish2026', 'admin123', 'admin123456', 'admin'];
+async function hashPassword(password: string, salt: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password + salt);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return hashHex;
+}
 
-export async function loginAdmin(password: string): Promise<string> {
-  const normalizedPassword = password.trim();
-
-  // Helper to check if a password is valid locally
-  const isLocalValid = ALLOWED_LOCAL_PASSWORDS.includes(normalizedPassword);
-
+export async function isFirstRun(): Promise<boolean> {
   try {
-    const userCredential = await signInWithEmailAndPassword(auth, ADMIN_EMAIL, normalizedPassword);
-    const token = await userCredential.user.getIdToken();
-    return token;
-  } catch (error: any) {
-    if (error.code === 'auth/operation-not-allowed') {
-      if (isLocalValid) {
-        localStorage.setItem('isLocalAdmin', 'true');
-        return 'local-admin-token-bypass';
-      } else {
-        throw new Error('Mật khẩu quản trị viên không chính xác. Thử mật khẩu mặc định: "conquerenglish" hoặc "admin123"');
-      }
-    }
-
-    // If user doesn't exist, we auto-create the admin user with the provided password
-    // This provides a smooth onboarding/bootstrapping experience for the first login
-    if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-      try {
-        const userCredential = await createUserWithEmailAndPassword(auth, ADMIN_EMAIL, normalizedPassword);
-        const token = await userCredential.user.getIdToken();
-        return token;
-      } catch (createError: any) {
-        if (createError.code === 'auth/operation-not-allowed') {
-          if (isLocalValid) {
-            localStorage.setItem('isLocalAdmin', 'true');
-            return 'local-admin-token-bypass';
-          } else {
-            throw new Error('Mật khẩu quản trị viên không chính xác. Thử mật khẩu mặc định: "conquerenglish" hoặc "admin123"');
-          }
-        }
-        throw new Error('Mật khẩu quản trị viên không chính xác.');
-      }
-    }
-    throw new Error(error.message || 'Mật khẩu quản trị viên không chính xác.');
+    const docRef = doc(db, 'settings', 'admin_auth');
+    const docSnap = await getDoc(docRef);
+    return !docSnap.exists();
+  } catch (error) {
+    console.error('Error checking first run:', error);
+    return false;
   }
 }
 
-export async function logoutAdmin(): Promise<void> {
-  localStorage.removeItem('isLocalAdmin');
-  await signOut(auth);
+export async function setupAdmin(password: string): Promise<void> {
+  const salt = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  const hash = await hashPassword(password, salt);
+  
+  const docRef = doc(db, 'settings', 'admin_auth');
+  await setDoc(docRef, {
+    hash,
+    salt,
+    createdAt: new Date().toISOString()
+  });
 }
 
-export function getCurrentAdminToken(): Promise<string | null> {
-  return new Promise((resolve) => {
-    if (localStorage.getItem('isLocalAdmin') === 'true') {
-      resolve('local-admin-token-bypass');
-      return;
-    }
-    const unsubscribe = auth.onAuthStateChanged(async (user) => {
-      unsubscribe();
-      if (user) {
-        try {
-          const token = await user.getIdToken();
-          resolve(token);
-        } catch {
-          resolve(null);
-        }
-      } else {
-        resolve(null);
-      }
-    });
+export async function loginAdmin(password: string): Promise<string> {
+  const docRef = doc(db, 'settings', 'admin_auth');
+  const docSnap = await getDoc(docRef);
+  if (!docSnap.exists()) {
+    throw new Error('Hệ thống chưa được thiết lập tài khoản Admin. Vui lòng thiết lập trước.');
+  }
+  
+  const { hash: storedHash, salt } = docSnap.data();
+  const computedHash = await hashPassword(password, salt);
+  
+  if (computedHash === storedHash) {
+    return 'admin-token-authenticated';
+  } else {
+    throw new Error('Mật khẩu quản trị viên không chính xác.');
+  }
+}
+
+export async function changeAdminPassword(currentPassword: string, newPassword: string): Promise<void> {
+  const docRef = doc(db, 'settings', 'admin_auth');
+  const docSnap = await getDoc(docRef);
+  if (!docSnap.exists()) {
+    throw new Error('Hệ thống chưa được thiết lập tài khoản Admin.');
+  }
+  
+  const { hash: storedHash, salt } = docSnap.data();
+  const computedHash = await hashPassword(currentPassword, salt);
+  
+  if (computedHash !== storedHash) {
+    throw new Error('Mật khẩu hiện tại không chính xác.');
+  }
+  
+  const newSalt = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  const newHash = await hashPassword(newPassword, newSalt);
+  
+  await updateDoc(docRef, {
+    hash: newHash,
+    salt: newSalt,
+    updatedAt: new Date().toISOString()
   });
+}
+
+export async function logoutAdmin(): Promise<void> {
+  localStorage.removeItem('adminToken');
+}
+
+export async function getCurrentAdminToken(): Promise<string | null> {
+  return localStorage.getItem('adminToken');
 }

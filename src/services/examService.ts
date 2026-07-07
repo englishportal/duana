@@ -94,6 +94,36 @@ export async function getExamById(id: string, isAdmin: boolean = false): Promise
   }
 }
 
+// Get single exam details by its ID or custom alphanumeric Code
+export async function getExamByCodeOrId(codeOrId: string, isAdmin: boolean = false): Promise<Exam | null> {
+  if (codeOrId === 'exam-test-1') {
+    return getExamById('exam-test-1', isAdmin);
+  }
+
+  try {
+    // 1. Try to get by document ID
+    const directDoc = await getExamById(codeOrId, isAdmin);
+    if (directDoc) {
+      return directDoc;
+    }
+
+    // 2. Query by code field
+    const q = query(collection(db, EXAMS_COLLECTION), where('code', '==', codeOrId));
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      const docSnap = snap.docs[0];
+      const exam = { id: docSnap.id, ...docSnap.data() } as Exam;
+      if (!isAdmin && exam.questions) {
+        exam.questions = exam.questions.map(({ correctAnswer, ...q }) => q as Question);
+      }
+      return exam;
+    }
+  } catch (error) {
+    console.error(`Error querying exam by code/id ${codeOrId}:`, error);
+  }
+  return null;
+}
+
 // Get all exams for Admin Panel (with attempts count)
 export async function getAdminExams(): Promise<Exam[]> {
   try {
