@@ -1,5 +1,5 @@
 import { collection, doc, getDocs, setDoc, deleteDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, handleFirestoreError, OperationType } from '../firebase';
 
 export interface Material {
   id: string;
@@ -21,8 +21,7 @@ export async function getMaterials(): Promise<Material[]> {
     });
     return list;
   } catch (error) {
-    console.error('Error fetching materials:', error);
-    return [];
+    handleFirestoreError(error, OperationType.GET, MATERIALS_COLLECTION);
   }
 }
 
@@ -37,11 +36,19 @@ export async function addMaterial(material: Partial<Material>): Promise<Material
     description: material.description || '',
     createdAt: material.createdAt || new Date().toISOString(),
   };
-  await setDoc(docRef, newMaterial);
-  return newMaterial;
+  try {
+    await setDoc(docRef, newMaterial);
+    return newMaterial;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `${MATERIALS_COLLECTION}/${id}`);
+  }
 }
 
 export async function deleteMaterial(id: string): Promise<void> {
   const docRef = doc(db, MATERIALS_COLLECTION, id);
-  await deleteDoc(docRef);
+  try {
+    await deleteDoc(docRef);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `${MATERIALS_COLLECTION}/${id}`);
+  }
 }

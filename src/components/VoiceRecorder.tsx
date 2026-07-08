@@ -24,6 +24,7 @@ export default function VoiceRecorder({
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [isSpeakingQuestion, setIsSpeakingQuestion] = useState(false);
   const [hasBlocked, setHasBlocked] = useState(hasRecord);
+  const [error, setError] = useState<string | null>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -54,11 +55,24 @@ export default function VoiceRecorder({
   const startRecording = async () => {
     if (hasBlocked) return;
     audioChunksRef.current = [];
+    setError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: "audio/webm",
-      });
+      
+      let options = {};
+      if (typeof MediaRecorder.isTypeSupported === "function") {
+        if (MediaRecorder.isTypeSupported("audio/webm")) {
+          options = { mimeType: "audio/webm" };
+        } else if (MediaRecorder.isTypeSupported("audio/mp4")) {
+          options = { mimeType: "audio/mp4" };
+        } else if (MediaRecorder.isTypeSupported("audio/ogg")) {
+          options = { mimeType: "audio/ogg" };
+        } else if (MediaRecorder.isTypeSupported("audio/wav")) {
+          options = { mimeType: "audio/wav" };
+        }
+      }
+
+      const mediaRecorder = new MediaRecorder(stream, options);
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -67,7 +81,8 @@ export default function VoiceRecorder({
       };
 
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        const finalMimeType = mediaRecorder.mimeType || "audio/webm";
+        const audioBlob = new Blob(audioChunksRef.current, { type: finalMimeType });
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
         reader.onloadend = () => {
@@ -84,9 +99,12 @@ export default function VoiceRecorder({
       mediaRecorder.start();
       setIsRecording(true);
       setRecordingSeconds(0);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Lỗi khởi tạo ghi âm:", err);
-      alert("Không thể khởi động micro. Vui lòng cho phép quyền truy cập micro trong cài đặt trình duyệt của bạn.");
+      const errMsg = err?.message || err?.name || String(err);
+      setError(
+        `Không thể khởi động micro (Chi tiết: ${errMsg}). Nếu bạn đang sử dụng chế độ Xem Thử trong khung (Iframe), vui lòng bấm nút "Mở tab mới" (biểu tượng mũi tên ở góc trên bên phải trình duyệt xem thử) để cấp quyền truy cập micro trực tiếp.`
+      );
     }
   };
 
@@ -134,6 +152,15 @@ export default function VoiceRecorder({
             <Volume2 size={14} />
             {isSpeakingQuestion ? "Đang đọc..." : "AI Đọc câu hỏi"}
           </button>
+        </div>
+      )}
+
+      {error && (
+        <div className="p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 rounded-xl text-red-600 dark:text-red-400 text-xs flex gap-2.5 items-start">
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+          <div className="flex-1 space-y-1">
+            <span className="font-bold">Lỗi khởi tạo ghi âm:</span> {error}
+          </div>
         </div>
       )}
 

@@ -40,13 +40,54 @@ export async function loginAdmin(password: string): Promise<string> {
     throw new Error('Hệ thống chưa được thiết lập tài khoản Admin. Vui lòng thiết lập trước.');
   }
   
-  const { hash: storedHash, salt } = docSnap.data();
+  const authData = docSnap.data();
+  const { hash: storedHash, salt, failedAttempts = 0, lockedUntil = null } = authData;
+
+  // Check if account is currently locked
+  if (lockedUntil) {
+    const lockedTime = new Date(lockedUntil).getTime();
+    const now = Date.now();
+    if (now < lockedTime) {
+      const remainingMs = lockedTime - now;
+      const hours = Math.floor(remainingMs / (1000 * 60 * 60));
+      const minutes = Math.ceil((remainingMs % (1000 * 60 * 60)) / 60000);
+      let timeText = '';
+      if (hours > 0) {
+        timeText = `${hours} giờ ${minutes} phút`;
+      } else {
+        timeText = `${minutes} phút`;
+      }
+      throw new Error(`Tài khoản Admin đã bị khóa do nhập sai quá 5 lần. Vui lòng chờ thêm ${timeText}.`);
+    }
+  }
+  
   const computedHash = await hashPassword(password, salt);
   
   if (computedHash === storedHash) {
+    // Reset failed attempts on success
+    await updateDoc(docRef, {
+      failedAttempts: 0,
+      lockedUntil: null
+    });
     return 'admin-token-authenticated';
   } else {
-    throw new Error('Mật khẩu quản trị viên không chính xác.');
+    const newAttempts = failedAttempts + 1;
+    let newLockedUntil = null;
+    if (newAttempts >= 5) {
+      // Lock for 2 hours (2 * 60 * 60 * 1000 = 7,200,000 ms)
+      newLockedUntil = new Date(Date.now() + 7200000).toISOString();
+    }
+    
+    await updateDoc(docRef, {
+      failedAttempts: newAttempts,
+      lockedUntil: newLockedUntil
+    });
+
+    if (newAttempts >= 5) {
+      throw new Error('Bạn đã đăng nhập sai quá 5 lần. Tài khoản Admin đã bị khóa trong vòng 2 tiếng.');
+    } else {
+      throw new Error(`Mật khẩu quản trị viên không chính xác. Bạn còn ${5 - newAttempts} lần thử.`);
+    }
   }
 }
 

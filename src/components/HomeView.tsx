@@ -111,7 +111,11 @@ export default function HomeView({
             if (matched) {
               setSelectedTestId(matched.id);
               setIsTestLocked(true);
+            } else if (data.length > 0) {
+              setSelectedTestId(data[0].id);
             }
+          } else if (data.length > 0) {
+            setSelectedTestId(data[0].id);
           }
         })
         .catch((err) => console.error("Error loading public tests:", err));

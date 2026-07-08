@@ -37,9 +37,30 @@ export async function getPublicActiveExams(): Promise<Exam[]> {
       exams.push({ id: doc.id, ...doc.data() } as Exam);
     });
 
-    // Ensure we always have exam-test-1 if not explicitly deactivated or if list is empty
+    // Ensure we always have exam-test-1 prepended if not in list
     if (!exams.some((e) => e.id === 'exam-test-1')) {
-      // We can add a placeholder or let the frontend fall back
+      const docRef = doc(db, EXAMS_COLLECTION, 'exam-test-1');
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data() as Exam;
+        if (data.status === 'Đang mở') {
+          exams.unshift({ id: 'exam-test-1', ...data });
+        }
+      } else {
+        exams.unshift({
+          id: 'exam-test-1',
+          name: 'Test 1 On The Go (IELTS)',
+          code: 'exam-test-1',
+          category: 'IELTS',
+          status: 'Đang mở',
+          createdAt: '01/01/2026',
+          questions: [],
+          themeBgColor: '',
+          logoUrl: '',
+          audioUrl: '',
+          durationLimit: 45
+        });
+      }
     }
     return exams;
   } catch (error) {
@@ -53,42 +74,59 @@ export async function getPublicActiveExams(): Promise<Exam[]> {
 
 // Get single exam details (clearing correctAnswer for non-admin requests)
 export async function getExamById(id: string, isAdmin: boolean = false): Promise<Exam | null> {
-  if (id === 'exam-test-1') {
-    // exam-test-1 questions are in frontend data, but we can return basic structure
-    return {
-      id: 'exam-test-1',
-      name: 'Test 1 On The Go (IELTS)',
-      code: 'exam-test-1',
-      category: 'IELTS',
-      status: 'Đang mở',
-      createdAt: '01/01/2026',
-      questions: [],
-      themeBgColor: '',
-      logoUrl: '',
-      audioUrl: '',
-      durationLimit: 45
-    };
-  }
-
   try {
     const docRef = doc(db, EXAMS_COLLECTION, id);
     const docSnap = await getDoc(docRef);
-    if (!docSnap.exists()) {
-      return null;
+    
+    if (docSnap.exists()) {
+      const exam = { id: docSnap.id, ...docSnap.data() } as Exam;
+      
+      // Clear correct answers for student security
+      if (!isAdmin && exam.questions) {
+        exam.questions = exam.questions.map(({ correctAnswer, ...q }) => q as Question);
+      }
+      return exam;
     }
 
-    const exam = { id: docSnap.id, ...docSnap.data() } as Exam;
-    
-    // Clear correct answers for student security
-    if (!isAdmin && exam.questions) {
-      exam.questions = exam.questions.map(({ correctAnswer, ...q }) => q as Question);
+    // Fallback only if the document does not exist in Firestore
+    if (id === 'exam-test-1') {
+      return {
+        id: 'exam-test-1',
+        name: 'Test 1 On The Go (IELTS)',
+        code: 'exam-test-1',
+        category: 'IELTS',
+        status: 'Đang mở',
+        createdAt: '01/01/2026',
+        questions: [],
+        themeBgColor: '',
+        logoUrl: '',
+        audioUrl: '',
+        durationLimit: 45
+      };
     }
-    
-    return exam;
+
+    return null;
   } catch (error) {
     console.error(`Error fetching exam ${id}:`, error);
     if (error instanceof Error && (error.message.includes('permission') || error.message.includes('Permission'))) {
       handleFirestoreError(error, OperationType.GET, `${EXAMS_COLLECTION}/${id}`);
+    }
+    
+    // Fallback for exam-test-1 even if there was a connection error
+    if (id === 'exam-test-1') {
+      return {
+        id: 'exam-test-1',
+        name: 'Test 1 On The Go (IELTS)',
+        code: 'exam-test-1',
+        category: 'IELTS',
+        status: 'Đang mở',
+        createdAt: '01/01/2026',
+        questions: [],
+        themeBgColor: '',
+        logoUrl: '',
+        audioUrl: '',
+        durationLimit: 45
+      };
     }
     return null;
   }

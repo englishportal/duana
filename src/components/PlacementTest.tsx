@@ -16,7 +16,8 @@ import {
   X,
   Play,
   VolumeX,
-  Award
+  Award,
+  BookOpen
 } from "lucide-react";
 import AudioPlayerOnce from "./AudioPlayerOnce";
 import VoiceRecorder from "./VoiceRecorder";
@@ -433,7 +434,7 @@ export default function PlacementTest({
 
           {/* Timer Widget */}
           <div className="flex items-center gap-3 bg-white/10 px-4 py-2 rounded-lg border border-white/20">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-400 animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-400 animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
             <span className="text-lg sm:text-2xl font-mono font-bold tracking-widest text-white">
               {formatTimer(timeLeft)}
             </span>
@@ -520,48 +521,103 @@ export default function PlacementTest({
                 )}
 
                 <div className="space-y-6">
-                  {(customTest.questions || []).map((q: any, idx: number) => {
-                    const isSelectedKey = answers[q.id];
-                    return (
-                      <div key={`${q.id}-${idx}`} className="p-5 bg-slate-50/50 dark:bg-slate-900/45 border border-slate-200/60 dark:border-slate-800 rounded-2xl space-y-4 shadow-sm">
-                        <div className="flex justify-between items-start gap-4">
-                          <span className="text-xs font-extrabold px-3 py-1 bg-indigo-50 dark:bg-slate-800 text-indigo-700 dark:text-indigo-300 rounded-lg">
-                            Câu hỏi {idx + 1}
-                          </span>
-                        </div>
-                        <p className="text-slate-850 dark:text-slate-100 font-bold text-base sm:text-lg leading-relaxed">
-                          {q.questionText}
-                        </p>
+                  {(() => {
+                    let lastPassage = "";
+                    return (customTest.questions || []).map((q: any, idx: number) => {
+                      const isSelectedKey = answers[q.id];
+                      const showPassage = q.passage && q.passage.trim() !== "" && q.passage !== lastPassage;
+                      if (q.passage) {
+                        lastPassage = q.passage;
+                      }
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {(q.options || []).map((opt: any) => {
-                            const isSelected = isSelectedKey === opt.key;
-                            return (
-                              <button
-                                key={opt.key}
-                                type="button"
-                                onClick={() => updateAnswer(q.id, opt.key)}
-                                className={`flex items-center gap-4 p-4 border-2 rounded-xl transition text-left cursor-pointer group w-full ${
-                                  isSelected
-                                    ? "border-indigo-600 bg-blue-50/50 dark:bg-slate-800/60 dark:border-blue-400 text-indigo-700 dark:text-blue-300 font-extrabold"
-                                    : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-400 dark:hover:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold"
-                                }`}
-                              >
-                                <span className={`h-8 w-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0 transition-colors ${
-                                  isSelected
-                                    ? "bg-indigo-600 dark:bg-blue-400 text-white dark:text-slate-950"
-                                    : "bg-slate-100 dark:bg-slate-800 text-slate-650 dark:text-slate-400 group-hover:bg-slate-200 dark:group-hover:bg-slate-700"
-                                }`}>
-                                  {opt.key}
-                                </span>
-                                <span className="text-xs sm:text-sm font-medium">{opt.text}</span>
-                              </button>
-                            );
-                          })}
+                      return (
+                        <div key={`${q.id}-${idx}`} className="space-y-4">
+                          {showPassage && (
+                            <div className="p-6 bg-amber-50/10 dark:bg-slate-800/30 border border-amber-100/40 dark:border-slate-800 rounded-2xl space-y-3 mt-6 shadow-sm">
+                              <h3 className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-widest flex items-center gap-2">
+                                <BookOpen size={15} />
+                                BÀI ĐỌC (READING PASSAGE)
+                              </h3>
+                              <div className="text-sm text-slate-850 dark:text-slate-200 leading-relaxed text-justify whitespace-pre-line font-serif">
+                                {q.passage}
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="p-5 bg-slate-50/50 dark:bg-slate-900/45 border border-slate-200/60 dark:border-slate-800 rounded-2xl space-y-4 shadow-sm">
+                            <div className="flex justify-between items-center gap-4">
+                              <span className="text-xs font-extrabold px-3 py-1 bg-indigo-55 dark:bg-slate-800 text-indigo-700 dark:text-indigo-300 rounded-lg">
+                                Câu hỏi {idx + 1} {q.skill ? `• ${q.skill.toUpperCase()}` : ""}
+                              </span>
+                            </div>
+                            <p className="text-slate-850 dark:text-slate-100 font-bold text-base sm:text-lg leading-relaxed">
+                              {q.questionText}
+                            </p>
+
+                            {q.audioUrl && (
+                              <div className="p-4 bg-indigo-50/10 dark:bg-slate-800/40 border border-indigo-100 dark:border-slate-800 rounded-xl space-y-2">
+                                <h4 className="text-xs font-bold text-indigo-700 dark:text-indigo-400 flex items-center gap-1.5">
+                                  <Volume2 size={14} />
+                                  Đoạn băng nghe (Audio Clip)
+                                </h4>
+                                <audio src={q.audioUrl} controls className="w-full" />
+                              </div>
+                            )}
+
+                            {(q.type === "writing" || q.type === "sentence_rewrite" || q.skill === "writing" || q.skill === "sentence_rewrite") ? (
+                              <div className="space-y-2">
+                                <textarea
+                                  rows={4}
+                                  value={answers[q.id] || ""}
+                                  onChange={(e) => updateAnswer(q.id, e.target.value)}
+                                  placeholder="Nhập câu trả lời hoặc viết lại câu tại đây..."
+                                  className="w-full px-4 py-3 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-850 dark:text-slate-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                />
+                              </div>
+                            ) : (q.type === "speaking_record" || q.skill === "speaking") ? (
+                              <div className="space-y-2">
+                                <VoiceRecorder
+                                  questionId={q.id}
+                                  hasRecord={answers[`speaking_recorded_${q.id}`] === "recorded" || (!!answers[`speaking_recorded_${q.id}`] && answers[`speaking_recorded_${q.id}`] !== "skipped")}
+                                  isSkipped={answers[`speaking_recorded_${q.id}`] === "skipped"}
+                                  onRecordSaved={handleAudioSaved}
+                                  onSkip={() => handleSkipVoice(q.id)}
+                                  onResetSkip={() => handleResetSkipVoice(q.id)}
+                                />
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {(q.options || []).map((opt: any) => {
+                                  const isSelected = isSelectedKey === opt.key;
+                                  return (
+                                    <button
+                                      key={opt.key}
+                                      type="button"
+                                      onClick={() => updateAnswer(q.id, opt.key)}
+                                      className={`flex items-center gap-4 p-4 border-2 rounded-xl transition text-left cursor-pointer group w-full ${
+                                        isSelected
+                                          ? "border-indigo-600 bg-blue-50/50 dark:bg-slate-800/60 dark:border-blue-400 text-indigo-700 dark:text-blue-300 font-extrabold"
+                                          : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-400 dark:hover:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold"
+                                      }`}
+                                    >
+                                      <span className={`h-8 w-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0 transition-colors ${
+                                        isSelected
+                                          ? "bg-indigo-600 dark:bg-blue-400 text-white dark:text-slate-950"
+                                          : "bg-slate-100 dark:bg-slate-800 text-slate-650 dark:text-slate-400 group-hover:bg-slate-200 dark:group-hover:bg-slate-700"
+                                      }`}>
+                                        {opt.key}
+                                      </span>
+                                      <span className="text-xs sm:text-sm font-medium">{opt.text}</span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    });
+                  })()}
 
                   {(customTest.questions || []).length === 0 && (
                     <div className="text-center py-12 border-2 border-dashed border-slate-250 dark:border-slate-800 rounded-2xl text-slate-400 font-semibold">

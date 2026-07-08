@@ -27,7 +27,8 @@ import {
   Link,
   Copy,
   FolderOpen,
-  BookOpen
+  BookOpen,
+  Shield
 } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 import { loginAdmin, logoutAdmin, getCurrentAdminToken, isFirstRun, setupAdmin, changeAdminPassword } from "../services/auth";
@@ -663,6 +664,9 @@ export default function AdminPanel({ isDarkMode, onThemeToggle, onClose, onLogin
     const newQ = {
       id: `q_manual_${Date.now()}`,
       type: "mcq",
+      skill: "grammar",
+      passage: "",
+      audioUrl: "",
       questionText: "New English Question text...",
       options: [
         { key: "A", text: "Option A" },
@@ -689,6 +693,34 @@ export default function AdminPanel({ isDarkMode, onThemeToggle, onClose, onLogin
     setTestForm((prev) => ({
       ...prev,
       questions: prev.questions.map((q) => (q.id === qId ? { ...q, questionText: val } : q))
+    }));
+  };
+
+  const updateQuestionSkill = (qId: string, val: string) => {
+    setTestForm((prev) => ({
+      ...prev,
+      questions: prev.questions.map((q) => (q.id === qId ? { ...q, skill: val } : q))
+    }));
+  };
+
+  const updateQuestionType = (qId: string, val: string) => {
+    setTestForm((prev) => ({
+      ...prev,
+      questions: prev.questions.map((q) => (q.id === qId ? { ...q, type: val } : q))
+    }));
+  };
+
+  const updateQuestionPassage = (qId: string, val: string) => {
+    setTestForm((prev) => ({
+      ...prev,
+      questions: prev.questions.map((q) => (q.id === qId ? { ...q, passage: val } : q))
+    }));
+  };
+
+  const updateQuestionAudioUrl = (qId: string, val: string) => {
+    setTestForm((prev) => ({
+      ...prev,
+      questions: prev.questions.map((q) => (q.id === qId ? { ...q, audioUrl: val } : q))
     }));
   };
 
@@ -1550,62 +1582,144 @@ export default function AdminPanel({ isDarkMode, onThemeToggle, onClose, onLogin
                 </div>
 
                 <div className="space-y-4 max-h-[580px] overflow-y-auto pr-2">
-                  {testForm.questions.map((q, idx) => (
-                    <div key={`${q.id}-${idx}`} className="p-4 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl space-y-3 relative group">
-                      <button
-                        onClick={() => removeQuestion(q.id)}
-                        className="absolute top-3 right-3 p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 opacity-70 hover:opacity-100 transition"
-                        title="Xóa câu hỏi này"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                  {testForm.questions.map((q, idx) => {
+                    const skill = q.skill || "grammar";
+                    const type = q.type || "mcq";
+                    return (
+                      <div key={`${q.id}-${idx}`} className="p-5 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl space-y-4 relative group">
+                        <button
+                          onClick={() => removeQuestion(q.id)}
+                          className="absolute top-4 right-4 p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 opacity-70 hover:opacity-100 transition"
+                          title="Xóa câu hỏi này"
+                        >
+                          <Trash2 size={14} />
+                        </button>
 
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-black bg-indigo-50 dark:bg-slate-800 text-indigo-700 dark:text-indigo-300 px-2.5 py-1 rounded">
-                          Câu {idx + 1}
-                        </span>
-                        <span className="text-[10px] text-slate-400 font-mono font-bold">{q.id}</span>
-                      </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs font-black bg-indigo-50 dark:bg-slate-800 text-indigo-700 dark:text-indigo-300 px-2.5 py-1 rounded">
+                            Câu {idx + 1}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono font-bold">{q.id}</span>
+                        </div>
 
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold uppercase text-slate-450">Nội dung câu hỏi</label>
-                        <textarea
-                          rows={2}
-                          value={q.questionText}
-                          onChange={(e) => updateQuestionText(q.id, e.target.value)}
-                          className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-850 dark:text-slate-100 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                        />
-                      </div>
+                        {/* Skill & Type Configuration Row */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold uppercase text-slate-450">Kỹ năng (Skill)</label>
+                            <select
+                              value={skill}
+                              onChange={(e) => updateQuestionSkill(q.id, e.target.value)}
+                              className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                            >
+                              <option value="grammar">Grammar / Ngữ pháp</option>
+                              <option value="vocabulary">Vocabulary / Từ vựng</option>
+                              <option value="listening">Listening / Kỹ năng Nghe</option>
+                              <option value="reading">Reading / Kỹ năng Đọc</option>
+                              <option value="speaking">Speaking / Kỹ năng Nói</option>
+                              <option value="writing">Writing / Kỹ năng Viết</option>
+                            </select>
+                          </div>
 
-                      <div className="grid grid-cols-2 gap-3 pt-1">
-                        {(q.options || []).map((opt: any) => (
-                          <div key={opt.key} className="flex items-center gap-2">
-                            <span className="text-xs font-black text-slate-400">{opt.key}.</span>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold uppercase text-slate-450">Dạng câu hỏi (Type)</label>
+                            <select
+                              value={type}
+                              onChange={(e) => updateQuestionType(q.id, e.target.value)}
+                              className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                            >
+                              <option value="mcq">Trắc nghiệm (MCQ)</option>
+                              <option value="sentence_rewrite">Viết lại câu (Sentence Rewrite)</option>
+                              <option value="writing">Tự luận viết (Writing/Essay)</option>
+                              <option value="speaking_record">Ghi âm nói (Speaking Record)</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Passage input (for Reading/Long texts) */}
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold uppercase text-slate-450 flex items-center gap-1">
+                            Bài đọc chung / Passage (Dành cho Reading - Các câu liên tiếp có cùng bài đọc sẽ tự gom nhóm)
+                          </label>
+                          <textarea
+                            rows={3}
+                            placeholder="Nhập đoạn văn/bài đọc nếu có..."
+                            value={q.passage || ""}
+                            onChange={(e) => updateQuestionPassage(q.id, e.target.value)}
+                            className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-850 dark:text-slate-100 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 font-sans"
+                          />
+                        </div>
+
+                        {/* Audio URL input (for Listening questions) */}
+                        {skill === "listening" && (
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold uppercase text-slate-450 flex items-center gap-1">
+                              Đường dẫn File Audio nghe riêng (Listening Audio Link mp3/wav)
+                            </label>
                             <input
                               type="text"
-                              value={opt.text}
-                              onChange={(e) => updateQuestionOption(q.id, opt.key, e.target.value)}
-                              className="w-full px-2 py-1 text-xs border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                              placeholder="https://example.com/audio.mp3"
+                              value={q.audioUrl || ""}
+                              onChange={(e) => updateQuestionAudioUrl(q.id, e.target.value)}
+                              className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-850 dark:text-slate-100 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500"
                             />
                           </div>
-                        ))}
-                      </div>
+                        )}
 
-                      <div className="flex items-center gap-2.5 pt-2">
-                        <span className="text-[10px] font-bold uppercase text-slate-450">ĐÁP ÁN ĐÚNG:</span>
-                        <select
-                          value={q.correctAnswer}
-                          onChange={(e) => updateQuestionCorrect(q.id, e.target.value)}
-                          className="px-3 py-1 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded text-xs font-bold text-emerald-600 focus:outline-none"
-                        >
-                          <option value="A">A</option>
-                          <option value="B">B</option>
-                          <option value="C">C</option>
-                          <option value="D">D</option>
-                        </select>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold uppercase text-slate-450">Nội dung câu hỏi / Câu dẫn</label>
+                          <textarea
+                            rows={2}
+                            value={q.questionText}
+                            onChange={(e) => updateQuestionText(q.id, e.target.value)}
+                            className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-850 dark:text-slate-100 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          />
+                        </div>
+
+                        {type === "mcq" ? (
+                          <>
+                            <div className="grid grid-cols-2 gap-3 pt-1">
+                              {(q.options || []).map((opt: any) => (
+                                <div key={opt.key} className="flex items-center gap-2">
+                                  <span className="text-xs font-black text-slate-400">{opt.key}.</span>
+                                  <input
+                                    type="text"
+                                    value={opt.text}
+                                    onChange={(e) => updateQuestionOption(q.id, opt.key, e.target.value)}
+                                    className="w-full px-2 py-1 text-xs border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                  />
+                                </div>
+                              ))}
+                            </div>
+
+                            <div className="flex items-center gap-2.5 pt-2">
+                              <span className="text-[10px] font-bold uppercase text-slate-450">ĐÁP ÁN ĐÚNG TRẮC NGHIỆM:</span>
+                              <select
+                                value={q.correctAnswer}
+                                onChange={(e) => updateQuestionCorrect(q.id, e.target.value)}
+                                className="px-3 py-1 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded text-xs font-bold text-emerald-600 focus:outline-none"
+                              >
+                                <option value="A">A</option>
+                                <option value="B">B</option>
+                                <option value="C">C</option>
+                                <option value="D">D</option>
+                              </select>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="space-y-1.5 pt-1">
+                            <label className="text-[10px] font-bold uppercase text-slate-450">Đáp án đúng / Đáp án gợi ý mẫu</label>
+                            <input
+                              type="text"
+                              value={q.correctAnswer || ""}
+                              onChange={(e) => updateQuestionCorrect(q.id, e.target.value)}
+                              placeholder="Nhập câu trả lời chính xác, hoặc các từ khóa của đáp án..."
+                              className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-850 dark:text-slate-100 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                            />
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
 
                   {testForm.questions.length === 0 && (
                     <div className="text-center py-16 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl text-slate-400 font-medium">
@@ -2018,83 +2132,266 @@ export default function AdminPanel({ isDarkMode, onThemeToggle, onClose, onLogin
 
         {/* Tab 3: settings and customization */}
         {!selectedCandidate && !editingTest && activeTab === "settings" && (
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 sm:p-8 max-w-2xl mx-auto space-y-6">
-            <div>
-              <h2 className="text-xl font-bold text-slate-850 dark:text-slate-100">CẤU HÌNH GIAO DIỆN & LOGO HỆ THỐNG</h2>
-              <p className="text-xs text-slate-450 mt-1">
-                Thay đổi logo thương hiệu trường học, màu nền thương hiệu chủ đạo để cá nhân hóa phòng thi chuyên nghiệp.
-              </p>
-            </div>
-
-            <div className="space-y-5">
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-650 dark:text-slate-400 block">Màu nền thương hiệu chủ đạo (Theme Background Override)</label>
-                <div className="flex items-center gap-4">
-                  <input
-                    type="color"
-                    value={globalSettings.backgroundColor}
-                    onChange={(e) => setGlobalSettings({ ...globalSettings, backgroundColor: e.target.value })}
-                    className="h-12 w-16 p-1 border border-slate-250 dark:border-slate-800 rounded-xl bg-transparent cursor-pointer"
-                  />
-                  <div>
-                    <input
-                      type="text"
-                      value={globalSettings.backgroundColor}
-                      onChange={(e) => setGlobalSettings({ ...globalSettings, backgroundColor: e.target.value })}
-                      className="px-3 py-1.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 rounded-xl font-mono text-sm font-bold w-32 focus:outline-none"
-                    />
-                    <p className="text-[11px] text-slate-450 mt-1">Màu này sẽ áp dụng lên tiêu đề, nút bấm chính, và phù hiệu ở trang thi.</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-650 dark:text-slate-400">Đường dẫn Logo Trường học (Logo URL)</label>
-                <input
-                  type="text"
-                  placeholder="https://example.com/logo.png"
-                  value={globalSettings.logoUrl}
-                  onChange={(e) => setGlobalSettings({ ...globalSettings, logoUrl: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                />
-                <p className="text-[11px] text-slate-450">Tải ảnh logo lên các trang lưu trữ ảnh rồi dán trực tiếp đường dẫn vào đây để thay thế biểu tượng EPT mặc định.</p>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-650 dark:text-slate-400">Đường dẫn API Backend cho AI (External API URL)</label>
-                <input
-                  type="text"
-                  placeholder="https://your-backend-app.onrender.com"
-                  value={globalSettings.externalApiUrl || ""}
-                  onChange={(e) => setGlobalSettings({ ...globalSettings, externalApiUrl: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                />
-                <p className="text-[11px] text-slate-450">
-                  Nhập địa chỉ máy chủ Node.js/Express của bạn (ví dụ trên Render, Railway hoặc Vercel). Chỉ cần thiết khi chạy trên môi trường tĩnh như GitHub Pages để hỗ trợ tính năng AI quét ảnh đề thi. Để trống nếu chạy trực tiếp fullstack local.
+          <div className="space-y-6 max-w-2xl mx-auto">
+            {/* Part 1: Branding & Logo */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 sm:p-8 space-y-6">
+              <div>
+                <h2 className="text-xl font-bold text-slate-850 dark:text-slate-100 uppercase tracking-tight">CẤU HÌNH GIAO DIỆN & LOGO HỆ THỐNG</h2>
+                <p className="text-xs text-slate-450 mt-1">
+                  Thay đổi logo thương hiệu trường học, màu nền thương hiệu chủ đạo để cá nhân hóa phòng thi chuyên nghiệp.
                 </p>
               </div>
 
-              <div className="pt-4 border-t border-slate-150 dark:border-slate-800">
-                <button
-                  onClick={handleSaveBrandingSettings}
-                  disabled={settingsSaving}
-                  className="w-full py-3.5 text-white font-extrabold text-xs tracking-wider rounded-xl shadow-md transition active:scale-95 flex items-center justify-center gap-1.5"
-                  style={brandBgStyle}
-                >
-                  {settingsSaving ? (
-                    <>
-                      <RefreshCw size={13} className="animate-spin" />
-                      Đang lưu cấu hình...
-                    </>
-                  ) : (
-                    <>
-                      <Save size={14} />
-                      CẬP NHẬT CẤU HÌNH & GIAO DIỆN HỆ THỐNG
-                    </>
-                  )}
-                </button>
+              <div className="space-y-5">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-650 dark:text-slate-400 block">Màu nền thương hiệu chủ đạo (Theme Background Override)</label>
+                  <div className="flex items-center gap-4">
+                    <input
+                      type="color"
+                      value={globalSettings.backgroundColor}
+                      onChange={(e) => setGlobalSettings({ ...globalSettings, backgroundColor: e.target.value })}
+                      className="h-12 w-16 p-1 border border-slate-250 dark:border-slate-800 rounded-xl bg-transparent cursor-pointer"
+                    />
+                    <div>
+                      <input
+                        type="text"
+                        value={globalSettings.backgroundColor}
+                        onChange={(e) => setGlobalSettings({ ...globalSettings, backgroundColor: e.target.value })}
+                        className="px-3 py-1.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 rounded-xl font-mono text-sm font-bold w-32 focus:outline-none"
+                      />
+                      <p className="text-[11px] text-slate-450 mt-1">Màu này sẽ áp dụng lên tiêu đề, nút bấm chính, và phù hiệu ở trang thi.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-650 dark:text-slate-400">Đường dẫn Logo Trường học (Logo URL)</label>
+                  <input
+                    type="text"
+                    placeholder="https://example.com/logo.png"
+                    value={globalSettings.logoUrl}
+                    onChange={(e) => setGlobalSettings({ ...globalSettings, logoUrl: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-medium focus:outline-none"
+                  />
+                  <p className="text-[11px] text-slate-450">Tải ảnh logo lên các trang lưu trữ ảnh rồi dán trực tiếp đường dẫn vào đây để thay thế biểu tượng EPT mặc định.</p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-650 dark:text-slate-400">Đường dẫn API Backend cho AI (External API URL)</label>
+                  <input
+                    type="text"
+                    placeholder="https://your-backend-app.onrender.com"
+                    value={globalSettings.externalApiUrl || ""}
+                    onChange={(e) => setGlobalSettings({ ...globalSettings, externalApiUrl: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-medium focus:outline-none"
+                  />
+                  <p className="text-[11px] text-slate-450">
+                    Nhập địa chỉ máy chủ Node.js/Express của bạn (ví dụ trên Render, Railway hoặc Vercel). Chỉ cần thiết khi chạy trên môi trường tĩnh như GitHub Pages để hỗ trợ tính năng AI quét ảnh đề thi. Để trống nếu chạy trực tiếp fullstack local.
+                  </p>
+                </div>
+
+                <div className="pt-4 border-t border-slate-150 dark:border-slate-800">
+                  <button
+                    onClick={handleSaveBrandingSettings}
+                    disabled={settingsSaving}
+                    className="w-full py-3.5 text-white font-extrabold text-xs tracking-wider rounded-xl shadow-md transition active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+                    style={brandBgStyle}
+                  >
+                    {settingsSaving ? (
+                      <>
+                        <RefreshCw size={13} className="animate-spin" />
+                        Đang lưu cấu hình...
+                      </>
+                    ) : (
+                      <>
+                        <Save size={14} />
+                        CẬP NHẬT CẤU HÌNH & GIAO DIỆN HỆ THỐNG
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
+
+            {/* Part 2: Teacher Contact Information */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 sm:p-8 space-y-6">
+              <div>
+                <h2 className="text-xl font-bold text-slate-850 dark:text-slate-100 uppercase tracking-tight">THÔNG TIN LIÊN HỆ CỦA GIÁO VIÊN</h2>
+                <p className="text-xs text-slate-450 mt-1">
+                  Cung cấp các thông tin liên hệ chi tiết hiển thị trực tiếp lên giao diện học sinh khi bấm nút &quot;Liên hệ giáo viên&quot;.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-600 dark:text-slate-400">Tên Trung tâm / Giáo viên</label>
+                    <input
+                      type="text"
+                      placeholder="Ví dụ: Trung tâm Tiếng Anh EPT"
+                      value={globalSettings.contactName || ""}
+                      onChange={(e) => setGlobalSettings({ ...globalSettings, contactName: e.target.value })}
+                      className="w-full px-4 py-2 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm rounded-xl focus:outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-600 dark:text-slate-400">Số điện thoại liên hệ</label>
+                    <input
+                      type="text"
+                      placeholder="Ví dụ: 0987654321"
+                      value={globalSettings.contactPhone || ""}
+                      onChange={(e) => setGlobalSettings({ ...globalSettings, contactPhone: e.target.value })}
+                      className="w-full px-4 py-2 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm rounded-xl focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-600 dark:text-slate-400">Email liên hệ</label>
+                    <input
+                      type="email"
+                      placeholder="Ví dụ: teacher@example.com"
+                      value={globalSettings.contactEmail || ""}
+                      onChange={(e) => setGlobalSettings({ ...globalSettings, contactEmail: e.target.value })}
+                      className="w-full px-4 py-2 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm rounded-xl focus:outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-600 dark:text-slate-400">Số điện thoại / Link Zalo Chat</label>
+                    <input
+                      type="text"
+                      placeholder="Ví dụ: 0987654321 hoặc link zalo"
+                      value={globalSettings.contactZalo || ""}
+                      onChange={(e) => setGlobalSettings({ ...globalSettings, contactZalo: e.target.value })}
+                      className="w-full px-4 py-2 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm rounded-xl focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-600 dark:text-slate-400">Đường dẫn Facebook</label>
+                    <input
+                      type="text"
+                      placeholder="Ví dụ: https://facebook.com/yourpage"
+                      value={globalSettings.contactFacebook || ""}
+                      onChange={(e) => setGlobalSettings({ ...globalSettings, contactFacebook: e.target.value })}
+                      className="w-full px-4 py-2 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm rounded-xl focus:outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-600 dark:text-slate-400">Đường dẫn Trang Web</label>
+                    <input
+                      type="text"
+                      placeholder="Ví dụ: https://youracademy.edu.vn"
+                      value={globalSettings.contactWebsite || ""}
+                      onChange={(e) => setGlobalSettings({ ...globalSettings, contactWebsite: e.target.value })}
+                      className="w-full px-4 py-2 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm rounded-xl focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-600 dark:text-slate-400">Địa chỉ thực tế</label>
+                  <input
+                    type="text"
+                    placeholder="Ví dụ: 123 Đường Cầu Giấy, Hà Nội"
+                    value={globalSettings.contactAddress || ""}
+                    onChange={(e) => setGlobalSettings({ ...globalSettings, contactAddress: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm rounded-xl focus:outline-none"
+                  />
+                </div>
+
+                <div className="pt-4 border-t border-slate-150 dark:border-slate-800">
+                  <button
+                    onClick={handleSaveBrandingSettings}
+                    disabled={settingsSaving}
+                    className="w-full py-3.5 text-white font-extrabold text-xs tracking-wider rounded-xl shadow-md transition active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+                    style={brandBgStyle}
+                  >
+                    {settingsSaving ? (
+                      <>
+                        <RefreshCw size={13} className="animate-spin" />
+                        Đang lưu thông tin liên hệ...
+                      </>
+                    ) : (
+                      <>
+                        <Save size={14} />
+                        CẬP NHẬT THÔNG TIN LIÊN HỆ GIÁO VIÊN
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Part 3: Change Admin Password */}
+            <form onSubmit={handleChangePassword} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 sm:p-8 space-y-6">
+              <div>
+                <h2 className="text-xl font-bold text-slate-850 dark:text-slate-100 uppercase tracking-tight">THAY ĐỔI MẬT KHẨU QUẢN TRỊ VIÊN</h2>
+                <p className="text-xs text-slate-450 mt-1">
+                  Bảo vệ tài khoản quản trị bằng cách thay đổi mật khẩu định kỳ. Nhập mật khẩu hiện tại để xác minh chủ sở hữu.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-600 dark:text-slate-400">Mật khẩu hiện tại</label>
+                  <input
+                    type="password"
+                    placeholder="••••••••"
+                    value={changePasswordForm.currentPassword}
+                    onChange={(e) => setChangePasswordForm({ ...changePasswordForm, currentPassword: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm rounded-xl focus:outline-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-600 dark:text-slate-400">Mật khẩu mới</label>
+                    <input
+                      type="password"
+                      placeholder="Tối thiểu 6 ký tự..."
+                      value={changePasswordForm.newPassword}
+                      onChange={(e) => setChangePasswordForm({ ...changePasswordForm, newPassword: e.target.value })}
+                      className="w-full px-4 py-2 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm rounded-xl focus:outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-600 dark:text-slate-400">Nhập lại mật khẩu mới</label>
+                    <input
+                      type="password"
+                      placeholder="Trùng khớp mật khẩu mới..."
+                      value={changePasswordForm.confirmPassword}
+                      onChange={(e) => setChangePasswordForm({ ...changePasswordForm, confirmPassword: e.target.value })}
+                      className="w-full px-4 py-2 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm rounded-xl focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-slate-150 dark:border-slate-800">
+                  <button
+                    type="submit"
+                    disabled={passwordChangeSaving}
+                    className="w-full py-3.5 text-white font-extrabold text-xs tracking-wider rounded-xl shadow-md transition active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+                    style={brandBgStyle}
+                  >
+                    {passwordChangeSaving ? (
+                      <>
+                        <RefreshCw size={13} className="animate-spin" />
+                        Đang cập nhật mật khẩu mới...
+                      </>
+                    ) : (
+                      <>
+                        <Shield size={14} />
+                        THAY ĐỔI MẬT KHẨU TRUY CẬP ADMIN
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </form>
           </div>
         )}
       </main>
