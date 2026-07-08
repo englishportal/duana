@@ -564,6 +564,17 @@ export default function PlacementTest({
                               </div>
                             )}
 
+                            {q.imageUrl && (
+                              <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-2 max-w-lg mx-auto overflow-hidden">
+                                <img
+                                  src={q.imageUrl}
+                                  alt="Question illustration"
+                                  className="w-full h-auto max-h-72 object-contain rounded-xl"
+                                  referrerPolicy="no-referrer"
+                                />
+                              </div>
+                            )}
+
                             {(q.type === "writing" || q.type === "sentence_rewrite" || q.skill === "writing" || q.skill === "sentence_rewrite") ? (
                               <div className="space-y-2">
                                 <textarea

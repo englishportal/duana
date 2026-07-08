@@ -157,6 +157,8 @@ export default function App() {
               setView(ViewState.TEST);
             }
           }}
+          lang={lang}
+          onLanguageChange={handleLanguageChange}
         />
       )}
     </div>

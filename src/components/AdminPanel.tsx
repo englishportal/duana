@@ -31,6 +31,7 @@ import {
   Shield
 } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
+import { Language, translations } from "../locales";
 import { loginAdmin, logoutAdmin, getCurrentAdminToken, isFirstRun, setupAdmin, changeAdminPassword } from "../services/auth";
 import { getGlobalSettings, updateGlobalSettings } from "../services/settingsService";
 import { getAdminExams, createExam, updateExam, deleteExam } from "../services/examService";
@@ -158,9 +159,12 @@ interface AdminPanelProps {
   onThemeToggle: () => void;
   onClose: () => void;
   onLoginAsStudent?: (student: any) => void;
+  lang: Language;
+  onLanguageChange: (lang: Language) => void;
 }
 
-export default function AdminPanel({ isDarkMode, onThemeToggle, onClose, onLoginAsStudent }: AdminPanelProps) {
+export default function AdminPanel({ isDarkMode, onThemeToggle, onClose, onLoginAsStudent, lang, onLanguageChange }: AdminPanelProps) {
+  const t = translations[lang];
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -172,6 +176,59 @@ export default function AdminPanel({ isDarkMode, onThemeToggle, onClose, onLogin
   const [candidateExamFilter, setCandidateExamFilter] = useState("all");
   const [loginLoading, setLoginLoading] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [selectedExamForDetails, setSelectedExamForDetails] = useState<any | null>(null);
+  const activeExamDetails = selectedExamForDetails ? (tests.find(t => t.id === selectedExamForDetails.id) || selectedExamForDetails) : null;
+  const [cefrThresholds, setCefrThresholds] = useState<any>({ A1: 0, A2: 0, B1: 0, B2: 0, C1: 0, C2: 0 });
+
+  useEffect(() => {
+    if (selectedExamForDetails) {
+      const activeTest = tests.find(t => t.id === selectedExamForDetails.id) || selectedExamForDetails;
+      const total = activeTest.id === "exam-test-1" ? 75 : (activeTest.questions?.length || 0);
+      setCefrThresholds({
+        A1: activeTest.levelThresholds?.A1 ?? 0,
+        A2: activeTest.levelThresholds?.A2 ?? Math.round(total * 0.15),
+        B1: activeTest.levelThresholds?.B1 ?? Math.round(total * 0.35),
+        B2: activeTest.levelThresholds?.B2 ?? Math.round(total * 0.55),
+        C1: activeTest.levelThresholds?.C1 ?? Math.round(total * 0.75),
+        C2: activeTest.levelThresholds?.C2 ?? Math.round(total * 0.90),
+      });
+    }
+  }, [selectedExamForDetails, tests]);
+
+  const handleSaveCefrThresholds = async () => {
+    if (!activeExamDetails) return;
+    try {
+      const updatedExam = {
+        ...activeExamDetails,
+        levelThresholds: cefrThresholds
+      };
+      await updateExam(activeExamDetails.id, updatedExam);
+      showToast("Đã lưu cấu hình thang điểm CEFR thành công!", "success");
+      fetchAdminData();
+    } catch (err: any) {
+      showToast("Lỗi khi lưu cấu hình: " + (err.message || err), "error");
+    }
+  };
+
+  const getCEFRLevel = (score: number, test: any): string => {
+    if (!test) return "A1";
+    const total = test.id === "exam-test-1" ? 75 : (test.questions?.length || 0);
+    const thresholds = test.levelThresholds || {
+      A1: 0,
+      A2: Math.round(total * 0.15),
+      B1: Math.round(total * 0.35),
+      B2: Math.round(total * 0.55),
+      C1: Math.round(total * 0.75),
+      C2: Math.round(total * 0.90),
+    };
+
+    if (score >= (thresholds.C2 ?? Math.round(total * 0.90))) return "C2";
+    if (score >= (thresholds.C1 ?? Math.round(total * 0.75))) return "C1";
+    if (score >= (thresholds.B2 ?? Math.round(total * 0.55))) return "B2";
+    if (score >= (thresholds.B1 ?? Math.round(total * 0.35))) return "B1";
+    if (score >= (thresholds.A2 ?? Math.round(total * 0.15))) return "A2";
+    return "A1";
+  };
 
   // First run state
   const [isFirstAdminRun, setIsFirstAdminRun] = useState(false);
@@ -724,6 +781,20 @@ export default function AdminPanel({ isDarkMode, onThemeToggle, onClose, onLogin
     }));
   };
 
+  const updateQuestionListeningType = (qId: string, val: string) => {
+    setTestForm((prev) => ({
+      ...prev,
+      questions: prev.questions.map((q) => (q.id === qId ? { ...q, listeningType: val } : q))
+    }));
+  };
+
+  const updateQuestionImageUrl = (qId: string, val: string) => {
+    setTestForm((prev) => ({
+      ...prev,
+      questions: prev.questions.map((q) => (q.id === qId ? { ...q, imageUrl: val } : q))
+    }));
+  };
+
   const updateQuestionOption = (qId: string, optKey: string, val: string) => {
     setTestForm((prev) => ({
       ...prev,
@@ -1020,6 +1091,30 @@ export default function AdminPanel({ isDarkMode, onThemeToggle, onClose, onLogin
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Dynamic Language Toggle */}
+          <div className="flex items-center gap-1 border border-slate-200 dark:border-slate-800 rounded-xl p-0.5 bg-white/50 dark:bg-slate-900/50 mr-1">
+            <button
+              onClick={() => onLanguageChange("vi")}
+              className={`px-2 py-1 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${
+                lang === "vi"
+                  ? "bg-indigo-600 text-white shadow-sm"
+                  : "text-slate-500 hover:text-slate-850 dark:hover:text-slate-200"
+              }`}
+            >
+              VI
+            </button>
+            <button
+              onClick={() => onLanguageChange("en")}
+              className={`px-2 py-1 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${
+                lang === "en"
+                  ? "bg-indigo-600 text-white shadow-sm"
+                  : "text-slate-500 hover:text-slate-850 dark:hover:text-slate-200"
+              }`}
+            >
+              EN
+            </button>
+          </div>
+
           <ThemeToggle isDarkMode={isDarkMode} onToggle={onThemeToggle} />
           <button
             onClick={fetchAdminData}
@@ -1035,14 +1130,14 @@ export default function AdminPanel({ isDarkMode, onThemeToggle, onClose, onLogin
             className="px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 dark:bg-red-950/20 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 font-bold text-xs flex items-center gap-1.5 border border-red-200/50 dark:border-red-900/35 transition cursor-pointer active:scale-95"
           >
             <LogOut size={13} />
-            Đăng xuất
+            {t.adminLogout || "Đăng xuất"}
           </button>
           <button
             onClick={onClose}
             id="admin-backtohome-btn"
             className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-650 dark:text-slate-350 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold text-xs transition cursor-pointer shadow-sm active:scale-95"
           >
-            Về Trang Chủ
+            {t.adminClosePanel || "Về Trang Chủ"}
           </button>
         </div>
       </header>
@@ -1651,17 +1746,80 @@ export default function AdminPanel({ isDarkMode, onThemeToggle, onClose, onLogin
 
                         {/* Audio URL input (for Listening questions) */}
                         {skill === "listening" && (
-                          <div className="space-y-1.5">
-                            <label className="text-[10px] font-bold uppercase text-slate-450 flex items-center gap-1">
-                              Đường dẫn File Audio nghe riêng (Listening Audio Link mp3/wav)
-                            </label>
-                            <input
-                              type="text"
-                              placeholder="https://example.com/audio.mp3"
-                              value={q.audioUrl || ""}
-                              onChange={(e) => updateQuestionAudioUrl(q.id, e.target.value)}
-                              className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-850 dark:text-slate-100 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                            />
+                          <div className="space-y-3 p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-150 dark:border-slate-800">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-bold uppercase text-slate-450">
+                                  Dạng câu hỏi nghe
+                                </label>
+                                <select
+                                  value={q.listeningType || "text"}
+                                  onChange={(e) => updateQuestionListeningType(q.id, e.target.value)}
+                                  className="w-full px-2 py-1.5 text-xs border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-850 dark:text-slate-100 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 font-bold"
+                                >
+                                  <option value="text">Nghe trắc nghiệm chữ (Text-based)</option>
+                                  <option value="image">Nghe có hình ảnh minh họa (Image-based)</option>
+                                </select>
+                              </div>
+
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-bold uppercase text-slate-450">
+                                  Đường dẫn File Audio (.mp3/.wav)
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="https://example.com/audio.mp3"
+                                  value={q.audioUrl || ""}
+                                  onChange={(e) => updateQuestionAudioUrl(q.id, e.target.value)}
+                                  className="w-full px-3 py-1.5 text-xs border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-850 dark:text-slate-100 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Image-based option config */}
+                            {(q.listeningType === "image" || q.imageUrl) && (
+                              <div className="space-y-1.5 pt-1.5 border-t border-slate-200 dark:border-slate-850">
+                                <label className="text-[10px] font-bold uppercase text-slate-450 block">
+                                  Đường dẫn ảnh minh họa (Image URL) hoặc Tải lên hình ảnh
+                                </label>
+                                <div className="flex gap-2">
+                                  <input
+                                    type="text"
+                                    placeholder="https://example.com/illustration.png"
+                                    value={q.imageUrl || ""}
+                                    onChange={(e) => updateQuestionImageUrl(q.id, e.target.value)}
+                                    className="flex-1 px-3 py-1.5 text-xs border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-850 dark:text-slate-100 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono"
+                                  />
+                                  <label className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-350 rounded-lg font-bold text-xs flex items-center gap-1.5 transition cursor-pointer border border-slate-200 dark:border-slate-800">
+                                    <Plus size={12} />
+                                    Tải ảnh
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      className="hidden"
+                                      onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                          const fakeUrl = URL.createObjectURL(file);
+                                          updateQuestionImageUrl(q.id, fakeUrl);
+                                          showToast(`Đã nhận ảnh minh họa cho Câu hỏi!`, "success");
+                                        }
+                                      }}
+                                    />
+                                  </label>
+                                </div>
+                                {q.imageUrl && (
+                                  <div className="mt-1.5 p-1.5 bg-white dark:bg-slate-950 border border-slate-150 dark:border-slate-800 rounded-lg max-w-[150px] overflow-hidden">
+                                    <img
+                                      src={q.imageUrl}
+                                      alt="Listening visual preview"
+                                      className="w-full h-auto object-contain rounded max-h-24"
+                                      referrerPolicy="no-referrer"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         )}
 
@@ -1938,20 +2096,6 @@ export default function AdminPanel({ isDarkMode, onThemeToggle, onClose, onLogin
                                 {c.isBlocked ? <Lock size={14} /> : <Unlock size={14} />}
                               </button>
                               <button
-                                onClick={() => handleViewDetails(c.id)}
-                                className="p-2 rounded-xl bg-indigo-50/50 hover:bg-indigo-100 dark:bg-indigo-950 dark:hover:bg-indigo-900 text-indigo-600 dark:text-indigo-400 transition cursor-pointer inline-flex items-center justify-center"
-                                title="Xem và chấm bài"
-                              >
-                                <Eye size={15} />
-                              </button>
-                              <button
-                                onClick={() => triggerResetSession(c.id, c.fullName)}
-                                className="p-2 rounded-xl bg-amber-50/50 hover:bg-amber-100 dark:bg-amber-950 dark:hover:bg-amber-900 text-amber-600 dark:text-amber-400 transition cursor-pointer inline-flex items-center justify-center"
-                                title="Cho thi lại"
-                              >
-                                <RefreshCw size={14} />
-                              </button>
-                              <button
                                 onClick={() => triggerDeleteCandidate(c.id, c.fullName)}
                                 className="p-2 rounded-xl bg-red-50/50 hover:bg-red-100 dark:bg-red-950/20 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition cursor-pointer inline-flex items-center justify-center"
                                 title="Xóa"
@@ -1971,7 +2115,7 @@ export default function AdminPanel({ isDarkMode, onThemeToggle, onClose, onLogin
         )}
 
         {/* Tab 2: Config dynamic tests management */}
-        {!selectedCandidate && !editingTest && activeTab === "tests" && (
+        {!selectedCandidate && !editingTest && !selectedExamForDetails && activeTab === "tests" && (
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
@@ -2029,23 +2173,42 @@ export default function AdminPanel({ isDarkMode, onThemeToggle, onClose, onLogin
 
                   <div className="flex justify-between items-center text-xs">
                     <span className="font-bold text-slate-500">Mã: <code className="font-mono text-indigo-650">exam-test-1</code></span>
-                    <button
-                      onClick={() => {
-                        const defaultTestObj = tests.find(t => t.id === "exam-test-1") || {
-                          id: "exam-test-1",
-                          name: "IELTS Entrance Placement Test",
-                          code: "exam-test-1",
-                          category: "IELTS",
-                          status: "Đang mở",
-                          questions: [],
-                          durationLimit: 45
-                        };
-                        handleEditTest(defaultTestObj);
-                      }}
-                      className="p-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-indigo-600 dark:text-indigo-400 rounded-lg font-bold transition flex items-center gap-0.5 text-[11px]"
-                    >
-                      <Edit size={12} /> Cấu hình
-                    </button>
+                    <div className="flex gap-1.5">
+                      <button
+                        onClick={() => {
+                          const defaultTestObj = tests.find(t => t.id === "exam-test-1") || {
+                            id: "exam-test-1",
+                            name: "IELTS Entrance Placement Test",
+                            code: "exam-test-1",
+                            category: "IELTS",
+                            status: "Đang mở",
+                            questions: [],
+                            durationLimit: 45
+                          };
+                          setSelectedExamForDetails(defaultTestObj);
+                        }}
+                        className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950 dark:hover:bg-indigo-900 text-indigo-600 dark:text-indigo-400 rounded-lg font-extrabold transition flex items-center gap-1 text-[11px] cursor-pointer"
+                      >
+                        <Award size={12} /> Chi tiết & Thống kê
+                      </button>
+                      <button
+                        onClick={() => {
+                          const defaultTestObj = tests.find(t => t.id === "exam-test-1") || {
+                            id: "exam-test-1",
+                            name: "IELTS Entrance Placement Test",
+                            code: "exam-test-1",
+                            category: "IELTS",
+                            status: "Đang mở",
+                            questions: [],
+                            durationLimit: 45
+                          };
+                          handleEditTest(defaultTestObj);
+                        }}
+                        className="p-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-600 dark:text-slate-350 rounded-lg font-bold transition flex items-center gap-0.5 text-[11px] cursor-pointer"
+                      >
+                        <Edit size={12} /> Cấu hình
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2097,20 +2260,25 @@ export default function AdminPanel({ isDarkMode, onThemeToggle, onClose, onLogin
 
                       <div className="flex justify-between items-center text-xs">
                         <span className="font-bold text-slate-500">Mã: <code className="font-mono text-indigo-650 dark:text-blue-400">{test.id}</code></span>
-                        <div className="flex gap-2">
+                        <div className="flex gap-1.5">
+                          <button
+                            onClick={() => setSelectedExamForDetails(test)}
+                            className="px-2.5 py-1.5 bg-indigo-55 hover:bg-indigo-100 dark:bg-indigo-950 dark:hover:bg-indigo-900 text-indigo-600 dark:text-indigo-400 rounded-lg font-extrabold transition flex items-center gap-1 text-[11px] cursor-pointer"
+                          >
+                            <Award size={12} /> Chi tiết & Thống kê
+                          </button>
                           <button
                             onClick={() => handleEditTest(test)}
-                            className="p-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-indigo-600 dark:text-indigo-400 rounded-lg font-bold transition flex items-center gap-0.5 text-[11px]"
+                            className="p-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-600 dark:text-slate-350 rounded-lg font-bold transition flex items-center gap-0.5 text-[11px] cursor-pointer"
                           >
                             <Edit size={12} />
                             Sửa
                           </button>
                           <button
                             onClick={() => handleDeleteTest(test.id)}
-                            className="p-1.5 bg-red-50 hover:bg-red-100 dark:bg-red-950/20 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg font-bold transition flex items-center gap-0.5 text-[11px]"
+                            className="p-1.5 bg-red-50 hover:bg-red-100 dark:bg-red-950/20 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg font-bold transition flex items-center gap-0.5 text-[11px] cursor-pointer"
                           >
                             <Trash2 size={12} />
-                            Xóa
                           </button>
                         </div>
                       </div>
@@ -2130,7 +2298,627 @@ export default function AdminPanel({ isDarkMode, onThemeToggle, onClose, onLogin
           </div>
         )}
 
-        {/* Tab 3: settings and customization */}
+        {/* Sub-panel: Exam Detailed Statistics & Candidate List */}
+        {activeExamDetails && !selectedCandidate && !editingTest && (
+          <div className="space-y-6 animate-fade-in">
+            {/* Header and Back Button */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setSelectedExamForDetails(null)}
+                  className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-650 dark:text-slate-350 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 transition cursor-pointer active:scale-95"
+                  title="Quay lại danh sách đề thi"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-extrabold text-slate-850 dark:text-slate-100">
+                      {activeExamDetails.name}
+                    </h2>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-black bg-indigo-50 text-indigo-700 dark:bg-indigo-950/20 dark:text-indigo-400 uppercase tracking-wider">
+                      {activeExamDetails.category || "General"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-450 mt-0.5 font-bold">
+                    Mã đề thi: <code className="font-mono text-indigo-600 dark:text-indigo-400">{activeExamDetails.id}</code> • Thời gian làm bài: <span className="text-indigo-600">{activeExamDetails.durationLimit || 45} phút</span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleEditTest(activeExamDetails)}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
+                >
+                  <Edit size={13} />
+                  SỬA ĐỀ THI
+                </button>
+                <button
+                  onClick={() => setSelectedExamForDetails(null)}
+                  className="px-4 py-2 border border-slate-200 dark:border-slate-800 text-slate-650 dark:text-slate-350 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold text-xs rounded-xl transition cursor-pointer"
+                >
+                  ĐÓNG
+                </button>
+              </div>
+            </div>
+
+            {/* Statistics Widgets */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Total Candidates */}
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4">
+                <div className="p-3.5 rounded-xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400">
+                  <Users size={22} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Lượt học sinh tham gia</p>
+                  <p className="text-2xl font-black text-slate-805 dark:text-slate-100 mt-0.5">
+                    {candidates.filter(c => c.testId === activeExamDetails.id).length}
+                  </p>
+                </div>
+              </div>
+
+              {/* Completion rate */}
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4">
+                <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle size={22} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Tình trạng làm bài</p>
+                  <p className="text-xl font-black text-slate-805 dark:text-slate-100 mt-0.5">
+                    {candidates.filter(c => c.testId === activeExamDetails.id && c.status === "COMPLETED").length} nộp
+                    <span className="text-xs text-slate-405 font-medium block">/ {candidates.filter(c => c.testId === activeExamDetails.id && c.status !== "COMPLETED").length} đang thi</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Average completion time */}
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4">
+                <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400">
+                  <Clock size={22} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Thời gian làm trung bình</p>
+                  <p className="text-2xl font-black text-slate-805 dark:text-slate-100 mt-0.5">
+                    {(() => {
+                      const completed = candidates.filter(c => c.testId === activeExamDetails.id && c.status === "COMPLETED");
+                      if (completed.length === 0) return "0:00";
+                      const avgSec = completed.reduce((sum, c) => sum + (c.durationSeconds || 0), 0) / completed.length;
+                      return formatDuration(Math.round(avgSec));
+                    })()}
+                  </p>
+                </div>
+              </div>
+
+              {/* Total Questions */}
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4">
+                <div className="p-3.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/20 text-indigo-650 dark:text-indigo-400">
+                  <Award size={22} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Tổng số câu hỏi</p>
+                  <p className="text-2xl font-black text-slate-805 dark:text-slate-100 mt-0.5">
+                    {activeExamDetails.id === "exam-test-1" ? 75 : (activeExamDetails.questions?.length || 0)}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Detailed Bento Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Left Column: Daily stats and Threshold configuration */}
+              <div className="lg:col-span-4 space-y-6">
+                
+                {/* Daily attempt timeline */}
+                <div className="bg-white dark:bg-slate-900 p-5 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm space-y-4">
+                  <h3 className="text-xs font-extrabold text-slate-850 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                    <FileSpreadsheet size={15} className="text-indigo-600 dark:text-indigo-400" />
+                    Lượt thi theo từng ngày
+                  </h3>
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-56 overflow-y-auto pr-1">
+                    {(() => {
+                      const examCand = candidates.filter(c => c.testId === activeExamDetails.id);
+                      const dailyCounts: Record<string, number> = {};
+                      examCand.forEach(c => {
+                        try {
+                          const dateStr = new Date(c.startTime).toLocaleDateString("vi-VN", {
+                            day: "numeric",
+                            month: "numeric",
+                            year: "numeric"
+                          });
+                          dailyCounts[dateStr] = (dailyCounts[dateStr] || 0) + 1;
+                        } catch(e) {}
+                      });
+
+                      const sortedDays = Object.entries(dailyCounts).sort((a,b) => {
+                        const partsA = a[0].split("/").reverse().join("-");
+                        const partsB = b[0].split("/").reverse().join("-");
+                        return partsB.localeCompare(partsA);
+                      });
+
+                      if (sortedDays.length === 0) {
+                        return <p className="text-center py-6 text-xs text-slate-400 italic">Chưa có lượt tham gia nào</p>;
+                      }
+
+                      const maxAttempts = Math.max(...Object.values(dailyCounts));
+
+                      return sortedDays.map(([date, count]) => {
+                        const percent = maxAttempts > 0 ? (count / maxAttempts) * 100 : 0;
+                        return (
+                          <div key={date} className="py-2.5 flex items-center justify-between gap-4 text-xs font-semibold">
+                            <span className="font-mono text-slate-500">{date}</span>
+                            <div className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                              <div className="bg-indigo-600 h-full rounded-full" style={{ width: `${percent}%` }}></div>
+                            </div>
+                            <span className="text-slate-800 dark:text-slate-200">{count} lượt</span>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+
+                {/* Level Threshold Configurator */}
+                <div className="bg-white dark:bg-slate-900 p-5 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-xs font-extrabold text-slate-850 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                      <Shield size={15} className="text-indigo-600 dark:text-indigo-400" />
+                      Thang điểm levels CEFR
+                    </h3>
+                    <button
+                      onClick={handleSaveCefrThresholds}
+                      className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] rounded-lg shadow-sm cursor-pointer transition active:scale-95"
+                    >
+                      Lưu cấu hình
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Nhập số câu trắc nghiệm đúng tối thiểu của từng cấp độ để phân loại trình độ của học sinh (Tổng số câu: {activeExamDetails.id === "exam-test-1" ? 75 : (activeExamDetails.questions?.length || 0)}).
+                  </p>
+
+                  <div className="space-y-3 pt-2">
+                    {(["A1", "A2", "B1", "B2", "C1", "C2"] as const).map((lvl) => (
+                      <div key={lvl} className="flex items-center justify-between text-xs font-semibold">
+                        <span className="w-12 text-slate-500 font-bold">{lvl}:</span>
+                        <div className="flex items-center gap-2 flex-1 justify-end font-medium">
+                          <span className="text-[10px] text-slate-400">Số câu đúng &ge;</span>
+                          <input
+                            type="number"
+                            min={0}
+                            max={activeExamDetails.id === "exam-test-1" ? 75 : (activeExamDetails.questions?.length || 0)}
+                            value={cefrThresholds[lvl] ?? 0}
+                            onChange={(e) => {
+                              const total = activeExamDetails.id === "exam-test-1" ? 75 : (activeExamDetails.questions?.length || 0);
+                              const val = Math.max(0, Math.min(total, parseInt(e.target.value) || 0));
+                              setCefrThresholds((prev: any) => ({ ...prev, [lvl]: val }));
+                            }}
+                            className="w-16 px-2 py-1 text-center border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-850 dark:text-slate-100 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 font-bold"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Right Column: CEFR level distribution & Candidate list */}
+              <div className="lg:col-span-8 space-y-6">
+                
+                {/* Level division details */}
+                <div className="bg-white dark:bg-slate-900 p-5 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm space-y-4">
+                  <h3 className="text-xs font-extrabold text-slate-850 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                    <Award size={15} className="text-indigo-600 dark:text-indigo-400" />
+                    Thống kê phân loại trình độ levels (A1 - C2)
+                  </h3>
+                  
+                  {(() => {
+                    const examCandidates = candidates.filter(c => c.testId === activeExamDetails.id && c.status === "COMPLETED");
+                    const levelsCount = { A1: 0, A2: 0, B1: 0, B2: 0, C1: 0, C2: 0 };
+                    
+                    examCandidates.forEach(c => {
+                      const score = calculateCandidateScore(c, tests);
+                      const lvl = getCEFRLevel(score, activeExamDetails);
+                      if (lvl in levelsCount) {
+                        levelsCount[lvl as keyof typeof levelsCount]++;
+                      }
+                    });
+
+                    const totalCompleted = examCandidates.length;
+
+                    return (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+                        {(["A1", "A2", "B1", "B2", "C1", "C2"] as const).map(lvl => {
+                          const count = levelsCount[lvl];
+                          const percent = totalCompleted > 0 ? Math.round((count / totalCompleted) * 100) : 0;
+                          
+                          const lvlColorMap = {
+                            A1: "bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+                            A2: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400",
+                            B1: "bg-teal-50 text-teal-700 dark:bg-teal-950/20 dark:text-teal-400",
+                            B2: "bg-blue-50 text-blue-700 dark:bg-blue-950/20 dark:text-blue-400",
+                            C1: "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/20 dark:text-indigo-300",
+                            C2: "bg-rose-50 text-rose-700 dark:bg-rose-950/20 dark:text-rose-400",
+                          };
+
+                          return (
+                            <div key={lvl} className="p-3 rounded-xl text-center border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/60 flex flex-col justify-between space-y-1">
+                              <span className={`inline-block mx-auto px-2 py-0.5 rounded text-[10px] font-black uppercase ${lvlColorMap[lvl]}`}>
+                                {lvl}
+                              </span>
+                              <div>
+                                <p className="text-lg font-black text-slate-850 dark:text-slate-100">{count}</p>
+                                <p className="text-[10px] text-slate-400 font-bold">{percent}%</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Exam Specific Candidates List */}
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
+                  <div className="p-5 border-b border-slate-150 dark:border-slate-800 flex items-center justify-between">
+                    <h3 className="text-xs font-black text-slate-850 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                      <Users size={15} className="text-indigo-600 dark:text-indigo-400" />
+                      Học sinh tham gia đề thi này
+                    </h3>
+                    <span className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500">
+                      {candidates.filter(c => c.testId === activeExamDetails.id).length} học sinh
+                    </span>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-55 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 text-[10px] font-black uppercase tracking-wider border-b border-slate-150 dark:border-slate-800">
+                          <th className="py-3 px-4">Thí sinh</th>
+                          <th className="py-3 px-4">Bắt đầu lúc</th>
+                          <th className="py-3 px-4">Thời gian làm</th>
+                          <th className="py-3 px-4">Số câu đúng</th>
+                          <th className="py-3 px-4">Trình độ</th>
+                          <th className="py-3 px-4">Trạng thái</th>
+                          <th className="py-3 px-4 text-right">Hành động</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {(() => {
+                          const examCandidates = candidates.filter(c => c.testId === activeExamDetails.id);
+                          if (examCandidates.length === 0) {
+                            return (
+                              <tr>
+                                <td colSpan={7} className="text-center py-10 text-xs text-slate-400 italic font-semibold">
+                                  Chưa có học sinh nào tham gia đề thi này.
+                                </td>
+                              </tr>
+                            );
+                          }
+
+                          return examCandidates.map((c) => {
+                            const isStaticTest = (c.testId || "exam-test-1") === "exam-test-1";
+                            const testMaxQuestions = isStaticTest ? 75 : (activeExamDetails.questions?.length || 0);
+                            const score = calculateCandidateScore(c, tests);
+                            const lvl = getCEFRLevel(score, activeExamDetails);
+
+                            return (
+                              <tr key={c.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10 text-xs font-semibold">
+                                <td className="py-3 px-4">
+                                  <p className="font-extrabold text-slate-800 dark:text-slate-200">{c.fullName}</p>
+                                  <p className="text-[10px] font-mono text-slate-400 font-semibold">{c.phoneNumber}</p>
+                                </td>
+                                <td className="py-3 px-4 text-slate-500 font-medium">
+                                  {new Date(c.startTime).toLocaleString("vi-VN", {
+                                    hour: "numeric",
+                                    minute: "numeric",
+                                    day: "numeric",
+                                    month: "numeric"
+                                  })}
+                                </td>
+                                <td className="py-3 px-4 text-slate-700 dark:text-slate-300 font-bold">
+                                  {formatDuration(c.durationSeconds)}
+                                </td>
+                                <td className="py-3 px-4 font-black text-indigo-600 dark:text-indigo-400">
+                                  {c.status === "COMPLETED" ? `${score} / ${testMaxQuestions}` : "—"}
+                                </td>
+                                <td className="py-3 px-4">
+                                  {c.status === "COMPLETED" ? (
+                                    <span className="px-1.5 py-0.5 rounded font-black text-[10px] bg-indigo-50 text-indigo-700 dark:bg-indigo-950/20 dark:text-indigo-300 uppercase">
+                                      {lvl}
+                                    </span>
+                                  ) : "—"}
+                                </td>
+                                <td className="py-3 px-4">
+                                  <span className={`inline-flex px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${
+                                    c.status === "COMPLETED"
+                                      ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400 border border-emerald-100"
+                                      : "bg-amber-50 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400 border border-amber-100"
+                                  }`}>
+                                    {c.status === "COMPLETED" ? "Đã nộp" : "Đang thi"}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4 text-right space-x-1">
+                                  <button
+                                    onClick={() => handleViewDetails(c.id)}
+                                    className="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950 dark:hover:bg-indigo-900 text-indigo-600 dark:text-indigo-400 transition cursor-pointer inline-flex items-center justify-center"
+                                    title="Xem chi tiết & chấm điểm tự luận"
+                                  >
+                                    <Eye size={13} />
+                                  </button>
+                                  <button
+                                    onClick={() => triggerResetSession(c.id, c.fullName)}
+                                    className="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 dark:bg-amber-950 dark:hover:bg-amber-900 text-amber-600 dark:text-amber-400 transition cursor-pointer inline-flex items-center justify-center"
+                                    title="Cho thi lại"
+                                  >
+                                    <RefreshCw size={12} />
+                                  </button>
+                                  <button
+                                    onClick={() => triggerDeleteCandidate(c.id, c.fullName)}
+                                    className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-950/20 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition cursor-pointer inline-flex items-center justify-center"
+                                    title="Xóa thí sinh"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          });
+                        })()}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 3: Study Materials Workspace */}
+        {!selectedCandidate && !editingTest && activeTab === "materials" && (
+          <div className="space-y-6 animate-fade-in">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold text-slate-850 dark:text-slate-100">DANH SÁCH TÀI LIỆU HỌC TẬP CHIA SẺ</h2>
+                <p className="text-xs text-slate-450 mt-1">
+                  Đăng tải các tài liệu tự học, bài giảng video, sơ đồ tư duy hình ảnh, hoặc đính kèm các tệp file PDF cho học sinh truy cập tự do.
+                </p>
+              </div>
+
+              <button
+                onClick={() => setMaterialFormOpen(true)}
+                className="px-5 py-3 text-white font-extrabold text-xs tracking-wider rounded-xl shadow transition active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
+                style={brandBgStyle}
+              >
+                <Plus size={15} />
+                CHIA SẺ TÀI LIỆU MỚI
+              </button>
+            </div>
+
+            {/* Add Material Modal form */}
+            {materialFormOpen && (
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm space-y-4 animate-slide-up">
+                <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800">
+                  <h3 className="text-sm font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                    <BookOpen size={16} className="text-indigo-650" />
+                    Chia sẻ tài liệu mới
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setMaterialFormOpen(false);
+                      setMaterialForm({ title: "", type: "pdf", url: "", description: "" });
+                    }}
+                    className="p-1.5 text-slate-400 hover:text-slate-650 dark:hover:text-slate-250 rounded-lg cursor-pointer"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                <form onSubmit={handleSaveMaterial} className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-600 dark:text-slate-400 block">Tên tiêu đề tài liệu</label>
+                      <input
+                        type="text"
+                        placeholder="Ví dụ: Chiến thuật luyện nghe Part 1 hiệu quả..."
+                        value={materialForm.title || ""}
+                        onChange={(e) => setMaterialForm({ ...materialForm, title: e.target.value })}
+                        className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm rounded-xl focus:outline-none"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-600 dark:text-slate-400 block">Loại tài liệu</label>
+                      <select
+                        value={materialForm.type || "pdf"}
+                        onChange={(e) => setMaterialForm({ ...materialForm, type: e.target.value as any })}
+                        className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm rounded-xl focus:outline-none font-bold text-slate-750 dark:text-slate-350"
+                      >
+                        <option value="video">Video bài giảng</option>
+                        <option value="pdf">Tài liệu PDF / File tải lên</option>
+                        <option value="image">Hình ảnh / Sơ đồ minh họa</option>
+                        <option value="other">Gắn link / Khác</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-600 dark:text-slate-400 block">
+                      Đường dẫn tài liệu (URL) hoặc Tải lên tệp tin của thầy cô
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Dán link video bài giảng, link ảnh, link tài liệu PDF hoặc link bất kỳ..."
+                        value={materialForm.url || ""}
+                        onChange={(e) => setMaterialForm({ ...materialForm, url: e.target.value })}
+                        className="flex-1 px-4 py-2.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm rounded-xl focus:outline-none font-mono"
+                        required
+                      />
+                      <label className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-350 rounded-xl font-bold text-xs flex items-center gap-1.5 transition cursor-pointer border border-slate-200 dark:border-slate-800 active:scale-95">
+                        <Plus size={14} />
+                        Tải file
+                        <input
+                          type="file"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const fakeUrl = URL.createObjectURL(file);
+                              setMaterialForm(prev => ({
+                                ...prev,
+                                url: fakeUrl,
+                                title: prev.title || file.name.split('.')[0]
+                              }));
+                              showToast(`Đã nhận file "${file.name}" thành công!`, "success");
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-600 dark:text-slate-400 block">Mô tả ngắn</label>
+                    <textarea
+                      rows={2}
+                      placeholder="Nhập mô tả ngắn hướng dẫn học sinh phương pháp tự học tự luyện tập..."
+                      value={materialForm.description || ""}
+                      onChange={(e) => setMaterialForm({ ...materialForm, description: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm rounded-xl focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMaterialFormOpen(false);
+                        setMaterialForm({ title: "", type: "pdf", url: "", description: "" });
+                      }}
+                      className="px-4 py-2 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 text-xs font-bold rounded-xl hover:bg-slate-50 transition cursor-pointer"
+                    >
+                      HỦY BỎ
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={materialsSaving}
+                      className="px-5 py-2 text-white text-xs font-extrabold tracking-wider rounded-xl shadow transition active:scale-95 cursor-pointer flex items-center gap-1.5"
+                      style={brandBgStyle}
+                    >
+                      {materialsSaving ? <RefreshCw size={12} className="animate-spin" /> : <Save size={13} />}
+                      LƯU & CHIA SẺ TÀI LIỆU
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {/* Grid list of shared materials */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {materials.map((m) => {
+                const isYoutube = m.url && (m.url.includes("youtube.com") || m.url.includes("youtu.be"));
+                let videoId = "";
+                if (isYoutube) {
+                  if (m.url.includes("youtube.com/watch?v=")) {
+                    videoId = m.url.split("v=")[1]?.split("&")[0] || "";
+                  } else if (m.url.includes("youtu.be/")) {
+                    videoId = m.url.split("youtu.be/")[1]?.split("?")[0] || "";
+                  }
+                }
+
+                return (
+                  <div
+                    key={m.id}
+                    className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col justify-between"
+                  >
+                    <div>
+                      {/* Video Embed Playback or Preview */}
+                      {m.type === "video" && isYoutube && videoId ? (
+                        <div className="aspect-video w-full border-b border-slate-100 dark:border-slate-800 bg-slate-950">
+                          <iframe
+                            src={`https://www.youtube.com/embed/${videoId}`}
+                            title={m.title}
+                            className="w-full h-full"
+                            allowFullScreen
+                          />
+                        </div>
+                      ) : m.type === "image" && m.url ? (
+                        <div className="aspect-video w-full border-b border-slate-100 dark:border-slate-800 bg-slate-950 overflow-hidden flex items-center justify-center bg-slate-50">
+                          <img
+                            src={m.url}
+                            alt={m.title}
+                            className="w-full h-full object-contain"
+                            referrerPolicy="no-referrer"
+                          />
+                        </div>
+                      ) : (
+                        <div className="p-4 bg-slate-50 dark:bg-slate-800/30 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3">
+                          <div className={`p-2.5 rounded-xl ${
+                            m.type === "pdf"
+                              ? "bg-red-50 text-red-600 dark:bg-red-950/20 dark:text-red-400"
+                              : "bg-indigo-50 text-indigo-600 dark:bg-indigo-950/20 dark:text-indigo-400"
+                          }`}>
+                            <BookOpen size={20} />
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                              {m.type === "pdf" ? "Tài liệu PDF / FILE" : "GẮN LINK LIÊN KẾT"}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="p-5 space-y-2">
+                        <h3 className="font-extrabold text-slate-800 dark:text-slate-100 text-sm leading-snug line-clamp-1">
+                          {m.title}
+                        </h3>
+                        {m.description && (
+                          <p className="text-xs text-slate-450 line-clamp-2 leading-relaxed">
+                            {m.description}
+                          </p>
+                        )}
+                        <p className="text-[10px] text-slate-400 font-mono">
+                          Chia sẻ lúc: {new Date(m.createdAt).toLocaleDateString("vi-VN")}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="p-5 pt-0 flex gap-2 justify-end">
+                      <a
+                        href={m.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950 dark:hover:bg-indigo-900 text-indigo-650 dark:text-indigo-400 text-xs font-bold rounded-lg transition flex items-center gap-1 cursor-pointer"
+                      >
+                        <Link size={12} /> Mở tài liệu
+                      </a>
+                      <button
+                        onClick={() => handleDeleteMaterialTrigger(m.id, m.title)}
+                        className="p-1.5 bg-red-50 hover:bg-red-100 dark:bg-red-950/20 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg transition cursor-pointer flex items-center justify-center"
+                        title="Xóa tài liệu"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {materials.length === 0 && (
+                <div className="col-span-1 md:col-span-2 lg:col-span-3 text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-850 rounded-3xl text-slate-400 font-semibold space-y-2">
+                  <BookOpen size={36} className="mx-auto text-slate-350" />
+                  <p>Chưa có tài liệu học tập nào được chia sẻ.</p>
+                  <p className="text-xs font-normal text-slate-400 max-w-sm mx-auto">
+                    Thầy cô hãy nhấn nút &ldquo;Chia sẻ tài liệu mới&rdquo; ở góc trên bên phải để bắt đầu đăng tải bài giảng.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         {!selectedCandidate && !editingTest && activeTab === "settings" && (
           <div className="space-y-6 max-w-2xl mx-auto">
             {/* Part 1: Branding & Logo */}
